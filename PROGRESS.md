@@ -11,7 +11,7 @@ One box per PLAN.md iteration. `/next` works on the first unticked box; `/finish
 
 ## Phase 1 — Spike (M0)
 
-- [ ] 1.1 Pad probe
+- [x] 1.1 Pad probe — 2026-10-19 — tools/padprobe.py lists pads as JSON, typed x360/ds4/other by the GUID's USB IDs; --expect counts every Xbox pad, --watch [--seconds] reads them through XInput, --check-driver needs driver 1.21.442.0 and a DS4 pad the probe sees
 - [ ] 1.2 Spike: create both pad mixes
 - [ ] 1.3 Spike: a phone drives a pad
 - [ ] 1.4 Gate M0 and target games

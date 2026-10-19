@@ -15,6 +15,13 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-19 — padprobe counts every Xbox pad, but watches them through XInput
+- **Iteration:** 1.1
+- **Context:** pygame-ce 2.5.8 bundles SDL 2.32.10, which reads Xbox pads through its RAWINPUT driver by default. On the dev PC it listed 5 of 5 virtual Xbox 360 pads, although games that use XInput see only 4. It also delivered a pad's stick move only at the next button change. With `SDL_JOYSTICK_RAWINPUT=0`, SDL reads them through XInput instead: it listed 4 of the 5, the stick moves arrived when sent, and the GUIDs still carried the 045E:028E USB IDs.
+- **Decision:** The list and `--expect` keep SDL's default, so they count every Xbox pad. The design never creates more than 4, so `--expect "x360=4"` fails when leftover Xbox pads exist. `--watch` sets `SDL_JOYSTICK_RAWINPUT=0`, so stick moves show on time, and lists at most 4 Xbox pads. Every mode keeps a value the caller has set. `--check-driver` creates a DualShock 4 pad, so its result doesn't depend on how SDL reads Xbox pads.
+- **Alternatives:** XInput for every mode. Rejected: with 5 or more Xbox pads `--expect "x360=4"` would still pass, hiding leftover pads. Count both ways and fail if either differs. Not done: the default already catches extra pads, and `SDL_JOYSTICK_RAWINPUT=0` shows the XInput view on demand. SDL's default for `--watch` too. Rejected: stick moves would show late.
+- **Design change:** none
+
 ### 2026-10-19 — pygame-ce instead of pygame for the Python tools
 - **Iteration:** 0.2
 - **Context:** The dev machine runs Python 3.14. pygame 2.6.1 (the latest) ships Windows wheels only up to cp313, so `pip install pygame` would try a source build. pygame-ce 2.5.8 ships a cp314 win_amd64 wheel.
