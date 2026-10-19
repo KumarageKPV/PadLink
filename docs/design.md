@@ -507,7 +507,7 @@ Three layers: unit tests on the protocol, mappings and mode switch; a load simul
 
 **Game compatibility**
 
-- In M0, pick 3 target games. Include at least one Steam game that uses the Steam Input API directly and one that reads XInput.
+- In M0, pick 3 target games. Include at least one Steam game that uses the Steam Input API directly and one that reads XInput. The picks and their known caveats are in [target-games.md](target-games.md).
 - Test every game in both modes with 8 phones. Before each test, confirm PlayStation Configuration Support is on in Steam.
 - Record per game: players seen in each mode, whether a mid-game switch works, and the recommended mode. These results seed the default per-game profiles.
 
@@ -545,8 +545,8 @@ The largest risk is the retired ViGEmBus driver. The new risk from offering two 
 | ViGEmBus gets no more fixes, and a future Windows update breaks it | All virtual pads stop working | Pin 1.22.0; keep all pad code behind `IVirtualPadBackend`; vJoy backend as fallback; watch for a maintained successor driver |
 | Host picks All DualShock 4 for an XInput-only game | No players work in that game | First-run explanation; compatibility table recommends a mode per game; per-game profiles |
 | Host switches mode while a game is running | The game may not see the re-plugged pads | Confirmation dialog; help screen advises switching before launch; profiles switch as the game starts |
-| A game reads both input APIs badly in Mixed mode | Doubled or missing players | Test in M0; recommend All DualShock 4 for that game in its profile |
-| A target game gets controllers through Steam's virtual Xbox pads | Only 4 players work in that game, in either mode | Test with 8 phones in M0 and record results; warn when more than 4 players join a game known to stop at 4 |
+| A game reads both input APIs badly in Mixed mode | Doubled or missing players | Test in M2's target-game playtests; recommend All DualShock 4 for that game in its profile |
+| A target game gets controllers through Steam's virtual Xbox pads | Only 4 players work in that game, in either mode | Test with 8 phones in M2 and record results; warn when more than 4 players join a game known to stop at 4 |
 | Another physical Xbox controller is plugged in during Mixed mode | Player numbers shift by one | Startup and switch-time check; warning names the device |
 | PlayStation Configuration Support is off in Steam | Steam does not take over the DualShock 4 pads, so mapping and prompts may be wrong | First-run checklist and help screen; checked before every test |
 | Wi-Fi congestion with 8–16 phones | Lag spikes and dropped inputs | 5 GHz guidance, 58-byte packets, hotspot mode, per-slot latency on the PC |
@@ -572,7 +572,7 @@ If M0 can't show both pad mixes in SDL's test, the plan changes before any app c
 
 ## Open questions
 
-- [ ] Which 3 games are the targets? This decides whether 8 players is reachable in practice in each mode.
+- [x] Which 3 games are the targets? This decides whether 8 players is reachable in practice in each mode. Picked at M0: PICO PARK 2, Brawlhalla and Gang Beasts ([target-games.md](target-games.md)).
 - [ ] Which mode should first run pre-select: Mixed (safe for unknown games) or All DualShock 4 (best for Steam Input)?
 - [ ] Should a phone be able to request a mode change for the host to approve, or stay host-only?
 - [ ] Free, paid, or free with a one-time unlock?

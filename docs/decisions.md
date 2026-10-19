@@ -15,6 +15,20 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — Target games: PICO PARK 2, Brawlhalla and Gang Beasts
+- **Iteration:** 1.4
+- **Context:** The design leaves the 3 target games open ("Open questions"). Its rules ask for at least one Steam game that uses the Steam Input API directly and one that reads XInput. Gate M2 (PLAN.md 3.8) also needs one that supports 8 local players.
+- **Decision:** The user picked PICO PARK 2 (Steam app 2644470) as the Steam Input baseline, Brawlhalla as the XInput game with a 4-pad cap that players report, and Gang Beasts, which has an XInput toggle. PCGamingWiki lists 8 local players for all three. No source confirms that PICO PARK 2 uses the Steam Input API, though a player report suggests its 2021 predecessor reads pads only through Steam Input. So docs/target-games.md gives a check to run before Gate M2, and also records each game's caveats and sources. Some caveats clash with the design's rule to have PlayStation Configuration Support on. Where fewer than 8 players appear, 3.8 adds short diagnostic runs with Steam Input off. They are recorded, but only runs that follow the design's rule count toward the gate.
+- **Alternatives:** none were weighed in this session.
+- **Design change:** "Open questions": the target-games question is ticked, with a link to docs/target-games.md. "Testing and compatibility plan", Game compatibility: links docs/target-games.md.
+
+### 2026-10-20 — Gate M0 passes on padprobe, without a phone driving an Xbox pad
+- **Iteration:** 1.4
+- **Context:** Three parts of the design's M0 weren't met as written. (1) The gate says the pads appear in "SDL's controller test", and "Checking what Windows sees" names SDL3's controller test program. M0 checked them with `tools/padprobe.py`, which uses SDL 2.32.10's joystick API through pygame-ce. (2) The M0 scope says a phone drives an Xbox pad and a DualShock 4 pad. Following PLAN.md 1.3, `spike/server.py` drove only a DualShock 4 pad. (3) The risk table said to test two game risks in M0, with 8 phones: doubled or missing players in Mixed, and a game that gets pads through Steam's virtual Xbox pads. PLAN.md runs every game test at 3.8, and M0 had no host or phones for one.
+- **Decision:** The user accepted (1) and (2) at 1.4, and M0 passes with both recorded in docs/gates/M0.md. padprobe is PLAN.md 1.1's tool for every pad check, and it shows that pads appear and their type. SDL3's test program is left for the button checks, which no iteration runs yet; 4.8's device matrix is the closest fit. A phone first drives an Xbox pad in the 3.8 playtest. For (3), the two risk tests move to M2, where PLAN.md runs the target games with 8 phones.
+- **Alternatives:** Build SDL3's test program and check both mixes in it before M0 passes. Not chosen: it needs CMake and MSVC, for a check padprobe already covers for pad presence. Add an Xbox mode to `spike/server.py` and re-run the phone. Not chosen: it would change spike code outside 1.4's task, and the phone-to-server path doesn't depend on the pad type.
+- **Design change:** "Risks and mitigations": the two rows say M2 instead of M0.
+
 ### 2026-10-19 — padprobe counts every Xbox pad, but watches them through XInput
 - **Iteration:** 1.1
 - **Context:** pygame-ce 2.5.8 bundles SDL 2.32.10, which reads Xbox pads through its RAWINPUT driver by default. On the dev PC it listed 5 of 5 virtual Xbox 360 pads, although games that use XInput see only 4. It also delivered a pad's stick move only at the next button change. With `SDL_JOYSTICK_RAWINPUT=0`, SDL reads them through XInput instead: it listed 4 of the 5, the stick moves arrived when sent, and the GUIDs still carried the 045E:028E USB IDs.
