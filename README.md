@@ -13,6 +13,8 @@ Activate it before running `python tools/...` or `tools/doctor.ps1`, or before s
 - PowerShell: `.venv\Scripts\Activate.ps1`
 - Git Bash: `source .venv/Scripts/activate`
 
+`tools/doctor.ps1` warns when `python` is not this `.venv`.
+
 `.venv` is git-ignored, so each machine makes its own:
 
 ```powershell

@@ -7,6 +7,7 @@
     pygame (pygame-ce), and whether ViGEmBus is the 1.22.0 driver and can create a pad
     (via tools/vigem_check.py).
     Every check is required: exits 1 if any is missing, 0 if all are ok.
+    Also warns, without failing, when `python` is not the repo's .venv (README.md, "Python tools").
 
     Run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/doctor.ps1
 
@@ -146,6 +147,24 @@ function Test-Python {
     New-CheckResult $name $false "$version (need $script:PythonMinimum+)" $script:PythonFix
 }
 
+function Find-VenvPython {
+    # python.exe in the repo-root .venv, or $null when there is no .venv.
+    $python = Join-Path (Split-Path -Parent $PSScriptRoot) '.venv\Scripts\python.exe'
+    if (Test-Path -LiteralPath $python) { return $python }
+    return $null
+}
+
+function Get-VenvWarning {
+    # Returns a warning when `python` is not the repo's .venv, or $null.
+    # PythonPath: the resolved python command, $null when it is not on PATH.
+    # VenvPython: Find-VenvPython, $null when the repo has no .venv.
+    param($PythonPath, $VenvPython)
+    if (-not $VenvPython) { return 'the repo has no .venv. Make one with the steps in README.md, "Python tools", then activate it.' }
+    if ($PythonPath -and [IO.Path]::GetFullPath($PythonPath) -eq [IO.Path]::GetFullPath($VenvPython)) { return $null }
+    $found = if ($PythonPath) { $PythonPath } else { 'not on PATH' }
+    "python is not the repo's .venv ($found). Activate it: .venv\Scripts\Activate.ps1, or in Git Bash: source .venv/Scripts/activate"
+}
+
 function Test-PythonPackage {
     # Probe: Invoke-PackageProbe
     param([string]$Name, [string]$Fix, [bool]$PythonOk, $Probe)
@@ -232,7 +251,9 @@ function Get-DoctorExitCode([object[]]$Results) {
 }
 
 function Invoke-Doctor {
-    $python = Test-Python (Invoke-Probe 'python' @('--version'))
+    $pythonProbe = Invoke-Probe 'python' @('--version')
+    $python = Test-Python $pythonProbe
+    $venvWarning = Get-VenvWarning -PythonPath $pythonProbe.Path -VenvPython (Find-VenvPython)
     $vgamepad = $null
     $pygame = $null
     $vigem = $null
@@ -258,6 +279,7 @@ function Invoke-Doctor {
     Write-Host ''
     Format-DoctorTable $results | ForEach-Object { Write-Host $_ }
     Write-Host ''
+    if ($venvWarning) { Write-Host "Warning: $venvWarning" }
     $missing = @($results | Where-Object { -not $_.Ok }).Count
     if ($missing -eq 0) {
         Write-Host "All $($results.Count) checks ok."

@@ -32,6 +32,6 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 ### 2026-10-19 — Python tools run from a repo-root .venv
 - **Iteration:** 0.2
 - **Context:** The Python tools need vgamepad, pygame-ce, PyYAML, cryptography and zeroconf. They are installed in a `.venv` on Python 3.14.8, and the system Python has none of them, so a shell without the venv active fails the doctor.
-- **Decision:** Keep the git-ignored `.venv` at the repo root, with its packages pinned in `requirements.txt`. Activate it before running any `python` command or starting Claude Code. README.md, "Python tools", has the setup steps.
+- **Decision:** Keep the git-ignored `.venv` at the repo root, with its packages pinned in `requirements.txt`. Activate it before running any `python` command or starting Claude Code. README.md, "Python tools", has the setup steps. `tools/doctor.ps1` warns, without failing, when `python` is not the .venv one: a system Python that has the packages still runs the tools.
 - **Alternatives:** Install the packages into the system Python. Rejected: unpinned, and shared with every other project. Have `tools/doctor.ps1` find `.venv` on its own. Not done: activating covers every `python` command, not only the doctor.
 - **Design change:** none

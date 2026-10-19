@@ -193,6 +193,41 @@ Test-Case 'Packages are not checked without a working Python' {
     Assert-Equal 'not checked: needs Python' $r.Found 'found'
 }
 
+# --- Python .venv --------------------------------------------------------------
+
+$VenvPython = 'E:\repo\.venv\Scripts\python.exe'
+
+Test-Case 'No venv warning when python is the .venv one, whatever the case and slashes' {
+    Assert-Equal $null (Get-VenvWarning -PythonPath $VenvPython -VenvPython $VenvPython) 'same path'
+    Assert-Equal $null (Get-VenvWarning -PythonPath 'e:/repo/.venv/Scripts/python.exe' -VenvPython $VenvPython) 'other spelling'
+}
+
+Test-Case 'A system python warns with its path and how to activate the .venv' {
+    $w = Get-VenvWarning -PythonPath 'C:\Python314\python.exe' -VenvPython $VenvPython
+    Assert-True ($w -like "*not the repo's .venv (C:\Python314\python.exe)*") "warning: '$w'"
+    Assert-True ($w -like '*.venv\Scripts\Activate.ps1*') "should say how to activate: '$w'"
+    Assert-True ($w -like '*source .venv/Scripts/activate*') "should cover Git Bash: '$w'"
+}
+
+Test-Case 'python not on PATH warns too' {
+    $w = Get-VenvWarning -PythonPath $null -VenvPython $VenvPython
+    Assert-True ($w -like "*not the repo's .venv (not on PATH)*") "warning: '$w'"
+}
+
+Test-Case 'A repo without a .venv warns to make one' {
+    $w = Get-VenvWarning -PythonPath 'C:\Python314\python.exe' -VenvPython $null
+    Assert-True ($w -like '*no .venv*README.md, "Python tools"*') "warning: '$w'"
+}
+
+Test-Case "Find-VenvPython looks in the repo root's .venv" {
+    $expected = Join-Path $PSScriptRoot '..\..\.venv\Scripts\python.exe'
+    if (Test-Path -LiteralPath $expected) {
+        Assert-Equal ([IO.Path]::GetFullPath($expected)) ([IO.Path]::GetFullPath((Find-VenvPython))) 'path'
+    } else {
+        Assert-Equal $null (Find-VenvPython) 'no .venv'
+    }
+}
+
 # --- ViGEmBus ----------------------------------------------------------------
 
 $PadOk = { New-ProbeResult -Output 'ok: created and removed one virtual Xbox 360 pad' }
@@ -300,6 +335,7 @@ Test-Case 'doctor.ps1 exits 1 and lists Git as missing when PATH is empty' {
     # pip install vgamepad opens vgamepad's bundled ViGEmBus 1.17 setup, which downgrades the driver.
     Assert-True ($text -match ('(?m)^vgamepad\s+missing\s+not checked: needs Python\s+' + [regex]::Escape($script:VgamepadFix))) "vgamepad row not found in:`n$text"
     Assert-True ($script:VgamepadFix -like '*cancel*') "vgamepad fix should say to cancel the old setup: '$script:VgamepadFix'"
+    Assert-True ($text -match "(?m)^Warning: (python is not the repo's \.venv \(not on PATH\)|the repo has no \.venv)") "venv warning not found in:`n$text"
     Assert-True ($text -match 'checks missing') "summary line not found in:`n$text"
 }
 
