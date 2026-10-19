@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)", "Bash(dotnet test *)", "Bash(dotnet run *)", "Bash(dotnet format *)",
+      "Bash(flutter analyze *)", "Bash(flutter test *)", "Bash(flutter pub get *)",
+      "Bash(dart test *)", "Bash(dart format *)",
+      "Bash(python tools/*)",
+      "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)", "Bash(git add *)", "Bash(git commit *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Read(./**/*.pfx)", "Read(./**/*.jks)", "Read(./**/*.keystore)", "Read(./.env*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.py\"" }
+        ]
+      }
+    ]
+  }
+}
