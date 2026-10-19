@@ -1,0 +1,12 @@
+# Python packages for tools/ and spike/, installed in the repo's .venv (README.md, "Python tools").
+# Pinned from `pip freeze` on Python 3.14.8, 2026-10-19.
+vgamepad==0.1.0        # virtual pads: tools/vigem_check.py, spike/. Its install opens a ViGEmBus 1.17 setup: cancel it
+pygame-ce==2.5.8       # joystick API for tools/padprobe.py, in place of pygame (docs/decisions.md)
+PyYAML==6.0.3          # ci.yml parse check (PLAN.md 0.3)
+cryptography==50.0.2   # X25519, HKDF and HMAC for protocol/vectors/crypto.json (PLAN.md 2.1)
+zeroconf==0.151.5      # discovery browse check (PLAN.md 2.10)
+
+# Dependencies of the packages above
+cffi==2.1.1
+ifaddr==0.2.0
+pycparser==3.11

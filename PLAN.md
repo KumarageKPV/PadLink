@@ -275,7 +275,7 @@ Each block below is the instruction Claude follows. "Design" lists the `docs/des
 - **Design:** Tech stack (Shared and tooling)
 - **Task:** Add `.github/workflows/ci.yml`: a Windows job running `dotnet build` and the non-driver tests; an Ubuntu job running `dart test` and `flutter analyze` / `flutter test`; a job running `python tools/check_vectors.py`. Each job skips cleanly when its project doesn't exist yet. Cache NuGet and pub.
 - **Done when:** the YAML parses (`python -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" .github/workflows/ci.yml`).
-- **👤** Create the GitHub repo, push, and confirm the workflow goes green.
+- **👤** Push `main` to the existing `origin` (don't create a new GitHub repo), and confirm the workflow goes green.
 - **Commit:** `ci: add build and test workflow`
 
 ### Phase 1 — Spike (M0)

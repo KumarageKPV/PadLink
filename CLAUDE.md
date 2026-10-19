@@ -27,3 +27,4 @@ virtual Xbox 360 / DualShock 4 pads through the ViGEmBus driver.
 - XInput exposes only 4 Xbox pads; DualShock 4 pads reach games through HID / Steam Input.
 - ViGEmBus 1.22.0 is the final release; don't search for newer versions.
 - Ports: TCP 47820 (control), UDP 47821 (input). Shell may be PowerShell or Git Bash.
+- `python` must be the repo's `.venv` (README.md, "Python tools"); the system Python has no packages. Add packages to the pinned `requirements.txt`.
