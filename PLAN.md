@@ -1,6 +1,6 @@
 # PadLink — Build Plan for Claude Code
 
-*Last updated: 18 October 2026 · Builds the design in `docs/design.md` (the "Two Controller Modes" design doc)*
+*Last updated: 20 October 2026 · Builds the design in `docs/design.md` (the "Two Controller Modes" design doc)*
 
 This plan takes PadLink from an empty folder to a launched app in 41 small iterations. Each iteration is sized for one Claude Code session, ends with checks Claude can run itself, and is marked 👤 where only you can do a step (installing drivers, holding a phone, store accounts).
 
@@ -345,7 +345,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 2.5 Pad backend and mappings
 - **Depends on:** 2.2, 1.1
 - **Design:** Virtual controller layer
-- **Task:** In `PadLink.Core`, define `IVirtualPadBackend` (create a pad of type X360 or DS4, submit state, remove, feedback event, read XInput user index). Implement `FakePadBackend` (records every call in order) and `ViGEmPadBackend` with Nefarius.ViGEm.Client 1.21.256. Put the phone-to-report mappings in pure functions with precomputed lookups per pad type.
+- **Task:** In `PadLink.Core`, define `IVirtualPadBackend` (create a pad of type X360 or DS4, submit state, remove, feedback event, read XInput user index). Implement `FakePadBackend` (records every call in order) and `ViGEmPadBackend` with Nefarius.ViGEm.Client 1.21.256. Put the phone-to-report mappings in pure functions with precomputed lookups per pad type. First read docs/gates/M0.md, "Carried forward". In the spike, the driver's user-index call read 0 for every Xbox pad while the LED numbers gave 0–3, and the gate suggests an input check on an Xbox slot.
 - **Done when:** mapping tests pass against `mapping.json`; a `RequiresViGEm` test plugs 4 Xbox + 4 DS4 pads and `padprobe --expect "x360=4,ds4=4"` passes, then 8 DS4 with `x360=0,ds4=8`.
 - **Commit:** `core: pad backend with ViGEm and fake implementations`
 
@@ -387,7 +387,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 2.11 Flutter app scaffold
 - **Depends on:** 2.3
 - **Design:** Mobile app design; Platform considerations
-- **Task:** `flutter create` in `mobile/app` (org placeholder `com.example`, change later). Add Riverpod and go_router, empty screens for Find PC, Pair, Lobby, Controller and Settings, a theme, and a dependency on the local protocol package. Set Android manifest permissions and iOS Info.plist keys exactly as listed in the design. Lock to landscape on the Controller screen.
+- **Task:** `flutter create` in `mobile/app` (org placeholder `com.example`, change later). Add Riverpod and go_router, empty screens for Find PC, Pair, Lobby, Controller and Settings, a theme, and a dependency on the local protocol package. Set Android manifest permissions and iOS Info.plist keys exactly as listed in the design. Lock to landscape on the Controller screen. Android builds need NDK 28.2.13676358. Gradle's automatic install of it fails, and `tools/doctor.ps1` doesn't check for it (docs/gates/M0.md, "Carried forward").
 - **Done when:** `flutter analyze` is clean; a widget test navigates through all 5 screens.
 - **Commit:** `mobile: app scaffold`
 
@@ -425,7 +425,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 3.2 Mode manager
 - **Depends on:** 3.1
 - **Design:** Controller modes (all of it); Virtual controller layer
-- **Task:** Mixed and All DualShock 4 modes; the switch sequence (neutral reports → unplug all → plug Xbox pads first in slot order, then DS4 → `slot_changed` per phone); `mode_changed` broadcast; drop packets for a slot while Switching; XInput user-index check with a warning that names any extra physical Xbox pad; persist the current mode.
+- **Task:** Mixed and All DualShock 4 modes; the switch sequence (neutral reports → unplug all → plug Xbox pads first in slot order, then DS4 → `slot_changed` per phone); `mode_changed` broadcast; drop packets for a slot while Switching; XInput user-index check with a warning that names any extra physical Xbox pad; persist the current mode. Before the user-index check, read docs/gates/M0.md, "Carried forward", for the spike's user-index result and the suggested Xbox input check, and any docs/decisions.md entry 2.5 added about the user index.
 - **Done when:** fake-backend tests assert the exact call order for both directions of switch and that slots, colours and pairings are unchanged; a `RequiresViGEm` test switches with 8 simulated phones in under 2 s and `padprobe --expect` matches each mode.
 - **Commit:** `core: controller mode manager`
 
@@ -508,7 +508,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 4.5 Startup checks and help screens
 - **Depends on:** 3.5, 3.6
 - **Design:** PC companion app design (Startup checks); Platform considerations
-- **Task:** PC: ViGEmBus check with an install offer (bundled setup or winget), firewall profile check with a Public-network warning, client-isolation hint, hotspot fallback steps. Phone: local-network-denied (iOS), battery-saver tips (Android), "can't find PC" checklist.
+- **Task:** PC: ViGEmBus check with an install offer (bundled setup or winget), firewall profile check with a Public-network warning, client-isolation hint, hotspot fallback steps. Phone: local-network-denied (iOS), battery-saver tips (Android), "can't find PC" checklist. Also from M0 (docs/gates/M0.md, "Carried forward"): check that the PC and the phone are on the same subnet, and warn when the phone's USB tethering is on. In the spike, tethering took the PC off Wi-Fi.
 - **Done when:** each check has a test with a faked environment.
 - **Commit:** `feat: startup checks and help`
 
@@ -529,9 +529,9 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 
 #### 4.8 **Gate M3**
 - **Depends on:** 4.1–4.7
-- **Design:** Requirements; Testing and compatibility plan (Device and network matrix)
-- **Task:** Generate `docs/gates/M3.md`: one row per functional and non-functional requirement, with the test, script or gate file that proves it, and blanks where only a person can confirm.
-- **👤** Run the device and network matrix and fill the blanks.
+- **Design:** Requirements; Testing and compatibility plan (Device and network matrix; Checking what Windows sees)
+- **Task:** Generate `docs/gates/M3.md`: one row per functional and non-functional requirement, with the test, script or gate file that proves it, and blanks where only a person can confirm. Add rows for the design's two Windows checks, in both modes: SDL3's controller test program (every pad appears, with correct buttons) and joy.cpl (DirectInput visibility). M0 counted the pads with padprobe only (docs/gates/M0.md).
+- **👤** Run the device and network matrix and the two Windows checks, and fill the blanks.
 - **Done when:** every requirement row is proven or has an agreed exception in `docs/decisions.md`.
 - **Commit:** `docs: M3 gate`
 
