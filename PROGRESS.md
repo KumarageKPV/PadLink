@@ -12,7 +12,7 @@ One box per PLAN.md iteration. `/next` works on the first unticked box; `/finish
 ## Phase 1 — Spike (M0)
 
 - [x] 1.1 Pad probe — 2026-10-19 — tools/padprobe.py lists pads as JSON, typed x360/ds4/other by the GUID's USB IDs; --expect counts every Xbox pad, --watch [--seconds] reads them through XInput, --check-driver needs driver 1.21.442.0 and a DS4 pad the probe sees
-- [ ] 1.2 Spike: create both pad mixes
+- [x] 1.2 Spike: create both pad mixes — 2026-10-19 — spike/pads.py makes mixed (Xbox 360 slots 1–4, then DS4) or all-DS4 sets; padprobe saw x360=4,ds4=4 and ds4=8 at 8 pads, x360=4,ds4=12 and ds4=16 at 16, none left after; the driver's user-index call reads 0 for every Xbox pad while LED notifications give 0–3 (spike/RESULTS.md, for 2.5)
 - [ ] 1.3 Spike: a phone drives a pad
 - [ ] 1.4 Gate M0 and target games
 
