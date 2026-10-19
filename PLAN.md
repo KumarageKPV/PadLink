@@ -259,7 +259,7 @@ Each block below is the instruction Claude follows. "Design" lists the `docs/des
 - **Depends on:** —
 - **Design:** none (read sections 3–4 of this plan)
 - **Task:** Create the folder layout from section 3 (empty folders get a `.gitkeep`). Create every file in section 4 exactly as written, plus `.claude/hooks/format.py` as described. Create `PROGRESS.md` with one unticked checkbox per iteration in section 6 (id and title). Create `docs/decisions.md` with a heading and an entry template, `README.md` with a three-line summary, and a `.gitignore` covering .NET, Flutter, Python, IDE folders and signing files.
-- **Done when:** `git status` shows all files; `/skills` lists `next`, `verify` and `finish`; `/agents` lists `reviewer`; `PROGRESS.md` has 41 boxes.
+- **Done when:** `git status` shows all files; `/skills` lists `next`, `verify` and `finish`; `/context` shows 1 custom agent; `PROGRESS.md` has 41 boxes.
 - **Commit:** `chore: bootstrap repo and Claude Code setup`
 
 #### 0.2 Toolchain doctor
