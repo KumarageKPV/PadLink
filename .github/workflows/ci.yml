@@ -1,0 +1,143 @@
+# Builds and tests whichever parts of PadLink exist. The detect job looks for each project's
+# marker file, and the jobs and steps of a missing project are skipped, so CI stays green
+# while the repo fills in (PLAN.md 0.3). Tests: tools/tests/test_ci_workflow.py.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run; every push to main keeps its result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  detect:
+    name: Detect projects
+    runs-on: ubuntu-latest
+    outputs:
+      pc: ${{ steps.find.outputs.pc }}
+      dart: ${{ steps.find.outputs.dart }}
+      app: ${{ steps.find.outputs.app }}
+      vectors: ${{ steps.find.outputs.vectors }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # flag <output> <marker> <folder> <find tests>: true when the marker exists. If the folder
+      # holds the project's files but not its marker, the marker path is stale (say, a
+      # PadLink.slnx), so fail instead of skipping that project for good.
+      - name: Find project marker files
+        id: find
+        run: |
+          flag() {
+            local output=$1 marker=$2 folder=$3
+            shift 3
+            if [ -f "$marker" ]; then
+              echo "$output=true" >> "$GITHUB_OUTPUT"
+            elif [ -n "$(find "$folder" -type f \( "$@" \) -print -quit 2>/dev/null)" ]; then
+              echo "::error::$folder has project files but no $marker; update its marker in ci.yml"
+              exit 1
+            else
+              echo "$output=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::$marker not found; skipping its checks"
+            fi
+          }
+          flag pc pc/PadLink.sln pc -name '*.sln*' -o -name '*.csproj'
+          flag dart mobile/packages/padlink_protocol/pubspec.yaml mobile/packages -name pubspec.yaml -o -name '*.dart'
+          flag app mobile/app/pubspec.yaml mobile/app -name pubspec.yaml -o -name '*.dart'
+          flag vectors tools/check_vectors.py protocol/vectors -name '*.json'
+
+  pc:
+    name: PC (.NET)
+    needs: detect
+    if: needs.detect.outputs.pc == 'true'
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      # Not setup-dotnet's own cache: it fails when there is no packages.lock.json.
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('pc/**/*.csproj', 'pc/**/*.props', 'pc/**/packages.lock.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Build
+        run: dotnet build pc/PadLink.sln -warnaserror
+      # Runners have no ViGEmBus, so tests marked RequiresViGEm run only on a dev PC.
+      - name: Test (no driver)
+        run: dotnet test pc/PadLink.sln --filter "Category!=RequiresViGEm"
+
+  mobile:
+    name: Mobile (Dart and Flutter)
+    needs: detect
+    if: needs.detect.outputs.dart == 'true' || needs.detect.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Third-party, so pinned to a commit: a tag can be moved to new code.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.7' # docs/design.md, Tech stack; same pin as tools/doctor.ps1
+          cache: true # Flutter SDK
+          pub-cache: true # ~/.pub-cache, keyed on every pubspec.lock
+      - name: Protocol package - get packages
+        if: needs.detect.outputs.dart == 'true'
+        working-directory: mobile/packages/padlink_protocol
+        run: dart pub get
+      - name: Protocol package - test
+        if: needs.detect.outputs.dart == 'true'
+        working-directory: mobile/packages/padlink_protocol
+        run: dart test
+      - name: App - get packages
+        if: needs.detect.outputs.app == 'true'
+        working-directory: mobile/app
+        run: flutter pub get
+      - name: App - analyze
+        if: needs.detect.outputs.app == 'true'
+        working-directory: mobile/app
+        run: flutter analyze
+      - name: App - test
+        if: needs.detect.outputs.app == 'true'
+        working-directory: mobile/app
+        run: flutter test
+
+  python:
+    name: Python tools and vectors
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      # Only what tools/tests and check_vectors.py import, at the versions pinned in
+      # requirements.txt. vgamepad is left out: the tests fake it, and its install runs a driver setup.
+      - name: Install packages
+        run: python -m pip install -c requirements.txt PyYAML cryptography
+      - name: Tools tests
+        run: python -m unittest discover -s tools/tests -v
+      - name: Check protocol vectors
+        if: needs.detect.outputs.vectors == 'true'
+        run: python tools/check_vectors.py

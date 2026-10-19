@@ -7,7 +7,7 @@ One box per PLAN.md iteration. `/next` works on the first unticked box; `/finish
 
 - [x] 0.1 Bootstrap the repo and Claude Code setup — 2026-10-19 — folder layout, CLAUDE.md, .claude settings/format hook/skills/reviewer agent, PROGRESS.md, decisions log, README, .gitignore
 - [x] 0.2 Toolchain doctor — 2026-10-19 — tools/doctor.ps1 checks 9 items and prints ok/missing with fixes; ViGEmBus check runs tools/vigem_check.py and requires the 1.22.0 driver (file 1.21.442.0); pygame-ce chosen
-- [ ] 0.3 CI skeleton
+- [x] 0.3 CI skeleton — 2026-10-19 — ci.yml: a detect job gates the pc (Windows), mobile and python (Ubuntu) jobs on marker files and fails on stale ones; NuGet, pub and pip caches; the python job also runs tools/tests
 
 ## Phase 1 — Spike (M0)
 
