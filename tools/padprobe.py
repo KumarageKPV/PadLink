@@ -141,12 +141,20 @@ def watch(pygame, seconds=None, out=None, clock=time.monotonic, sleep=time.sleep
     def emit(**fields):
         print(json.dumps({"t": round(clock() - start, 3), **fields}), file=out, flush=True)
 
+    def add(index):
+        joystick = pygame.joystick.Joystick(index)
+        if joystick.get_instance_id() not in opened:
+            opened[joystick.get_instance_id()] = joystick
+            emit(event="added", pad=describe(joystick, index))
+
+    # SDL drops the added events of pads already connected when its joystick system starts before
+    # the video system, as it does here, so list those pads instead (found in PLAN.md 1.3).
+    for index in range(pygame.joystick.get_count()):
+        add(index)
     while seconds is None or clock() - start < seconds:
         for event in pygame.event.get():
             if event.type == pygame.JOYDEVICEADDED:
-                joystick = pygame.joystick.Joystick(event.device_index)
-                opened[joystick.get_instance_id()] = joystick
-                emit(event="added", pad=describe(joystick, event.device_index))
+                add(event.device_index)
             elif event.type == pygame.JOYDEVICEREMOVED:
                 opened.pop(event.instance_id, None)
                 emit(event="removed", instance_id=event.instance_id)

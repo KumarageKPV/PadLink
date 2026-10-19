@@ -303,6 +303,26 @@ class WatchTests(unittest.TestCase):
         )
         self.assertTrue(fake.display_ready)
 
+    def test_pads_already_connected_are_added_without_an_event(self):
+        # SDL drops the added events of pads already connected when its joystick system starts
+        # before the video system, as padprobe starts them.
+        pad = ds4(3)
+        _, lines = self.watch(FakePygame([pad]))
+        self.assertEqual([{"t": 0.0, "event": "added", "pad": padprobe.describe(pad, 0)}], lines)
+
+    def test_an_added_event_for_a_pad_already_listed_is_not_repeated(self):
+        fake = FakePygame([ds4(3)], batches=[[event(FakePygame.JOYDEVICEADDED, device_index=0)]])
+        _, lines = self.watch(fake)
+        self.assertEqual(["added"], [line["event"] for line in lines])
+
+    def test_a_pad_plugged_in_later_is_added_by_its_event(self):
+        pad = x360(5)
+        fake = FakePygame([ds4(3)], batches=[[], [event(FakePygame.JOYDEVICEADDED, device_index=1)]])
+        fake.arriving = [pad]
+        _, lines = self.watch(fake)
+        self.assertEqual({"t": 0.01, "event": "added", "pad": padprobe.describe(pad, 1)}, lines[-1])
+        self.assertEqual(2, len(lines))
+
     def test_axis_prints_only_when_rounded_value_changes(self):
         axis = FakePygame.JOYAXISMOTION
         fake = FakePygame(batches=[[
