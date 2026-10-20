@@ -1,0 +1,35 @@
+{
+  "description": "Keys and MACs (protocol/SPEC.md, Keys and MACs), all hex. The X25519 keys are RFC 7748 section 6.1's Alice (pc) and Bob (phone). pairingKeyInfo and sessionKeyInfo are the HKDF info inputs; the salt is 32 zero bytes. packetMac is the mac of input.json's typical packet. Every key in rejectedPublicKeys gives an all-zero shared secret, which both sides must refuse.",
+  "pc": {
+    "privateKey": "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a",
+    "publicKey": "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a"
+  },
+  "phone": {
+    "privateKey": "5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb",
+    "publicKey": "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f"
+  },
+  "sharedSecret": "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742",
+  "pairingCode": "042917",
+  "proof": "3898431965292a35ae219fc40e1ac25a58e0ebd023878817610398307ceda03c",
+  "pairingKeyInfo": "7061646c696e6b2f312070616972696e678520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6ade9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f",
+  "pairingKey": "2b06486fc2408d13a56d0a3b3f07c74f344424d427724823244b7eb1df7c3daa",
+  "pcNonce": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+  "phoneNonce": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+  "authMac": "cef8ce425f50d67fbefcb4fae8a24dc95a9dee51810803b74afd111b681bc2e5",
+  "sessionKeyInfo": "7061646c696e6b2f312073657373696f6ea0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+  "sessionKey": "4e11cdd91194e73a78fcb185a00f465d5419063002a102540cef352d5d19bec5",
+  "packetMac": {
+    "data": "5001010787d612002128393060a4d4fea00f800131d4",
+    "mac": "49cee433292354de"
+  },
+  "rejectedPublicKeys": [
+    {
+      "name": "zero",
+      "publicKey": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "one, a point of order 4",
+      "publicKey": "0100000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}

@@ -319,7 +319,7 @@ The mode decides each slot's pad type: in Mixed, slots 1–4 get Xbox 360 pads a
 | Triggers, 0–255 | Triggers, 0–255 | L2 / R2 analog, 0–255 |
 | Menu and home buttons | Back / Start / Guide | Share / Options / PS |
 | Sticks, int16 | Passed through, up is positive | Converted to byte 0–255 (centre 128) with Y flipped, since DS4 reports up as 0 |
-| D-pad bits | D-pad buttons | 8-way hat, or neutral |
+| D-pad bits | D-pad buttons | 8-way hat, or neutral; opposite directions cancel |
 | Rumble out | Large and small motor, 0–255 | Large and small motor, 0–255 |
 | Light out | Player LED index | Lightbar RGB, mapped to the slot colour |
 
@@ -335,7 +335,7 @@ The phone always sends the same 30-byte packet; only the PC's mapping differs by
 
 ## Networking protocol
 
-Each phone uses two channels: TCP for pairing, settings and mode changes, and UDP for a 30-byte input packet sent up to 120 times a second. Every input packet carries the full pad state, so a lost packet is simply replaced by the next one.
+Each phone uses two channels: TCP for pairing, settings and mode changes, and UDP for a 30-byte input packet sent up to 120 times a second. Every input packet carries the full pad state, so a lost packet is simply replaced by the next one. `protocol/SPEC.md` holds the byte-level contract (field names, encodings, key derivation, validation), and `protocol/vectors/` the shared test vectors.
 
 **Ports and discovery**
 
@@ -345,10 +345,10 @@ Each phone uses two channels: TCP for pairing, settings and mode changes, and UD
 
 **Join sequence**
 
-1. Phone opens TCP to the PC and sends `hello` {proto, deviceId, deviceName, platform, appVersion}.
-2. New phone: PC replies `pair_required` with its X25519 public key. Phone sends `pair` {phone X25519 public key, proof}, where proof = HMAC-SHA256(code, both public keys); the code itself never crosses the network. After 5 wrong codes the PC makes a new code. Both sides derive a pairing key with X25519 + HKDF-SHA256 and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI).
+1. Phone opens TCP to the PC and sends `hello` {proto, deviceId, deviceName, platform, appVersion, nonce}.
+2. New phone: PC replies `pair_required` with its X25519 public key and a nonce. Phone sends `pair` {phone X25519 public key, proof}, where proof = HMAC-SHA256(code, both public keys); the code itself never crosses the network. After 5 wrong codes the PC makes a new code. Both sides derive a pairing key with X25519 + HKDF-SHA256 and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI).
 3. Known phone: PC sends `challenge` {nonce}; phone answers `auth` {HMAC-SHA256(pairing key, nonce)}.
-4. PC sends `welcome` {slot, colour, mode, padType, udpPort}. `mode` is `mixed` or `all_ds4`; `padType` is `x360` or `ds4`. Both sides derive a per-session key from the pairing key and both nonces.
+4. PC sends `welcome` {slot, colour, mode, padType, udpPort}. `mode` is `mixed` or `all_ds4`; `padType` is `x360` or `ds4`. Both sides derive a per-session key from the pairing key and both nonces: the phone's from `hello`, and the PC's from `pair_required` or `challenge`.
 5. Phone starts sending UDP input packets; PC sends feedback packets back.
 6. Either side sends `bye` to leave. A dropped TCP link or 2 s of UDP silence moves the slot to Grace.
 
@@ -358,8 +358,8 @@ Framing is a little-endian u32 length followed by UTF-8 JSON, 4 KB maximum.
 
 | Message | Direction | Payload |
 | --- | --- | --- |
-| `hello` | Phone → PC | proto, deviceId, deviceName, platform, appVersion |
-| `pair_required` | PC → phone | PC public key |
+| `hello` | Phone → PC | proto, deviceId, deviceName, platform, appVersion, nonce |
+| `pair_required` | PC → phone | PC public key, nonce |
 | `pair` | Phone → PC | Phone public key, proof |
 | `challenge` / `auth` | PC → phone / phone → PC | nonce / HMAC |
 | `welcome` | PC → phone | slot, colour, mode, padType, udpPort |
@@ -400,7 +400,7 @@ magic, version, type 0x02, slot, large motor (u8), small motor (u8), colour R, G
 **Rules**
 
 - The PC drops any packet with a wrong magic, version or mac, or from an address that is not the slot's phone.
-- The PC drops any packet whose sequence is not newer than the last one seen. Gaps are fine: the newest state wins.
+- The PC drops any packet whose sequence is not newer than the last one it accepted for that slot, so a forged packet can't move the mark. Newer is serial-number order, so the u32 wraps. Gaps are fine: the newest state wins.
 - The phone sends at once on any button change, merges stick moves into a 120 Hz frame-synced loop, and repeats the current state at 20 Hz when idle.
 - Round-trip time comes from echoMs; the PC shows half of it as one-way latency.
 
@@ -413,8 +413,8 @@ PadLink works only on the local network, takes input only from paired phones, an
 | Someone on the same Wi-Fi sends fake input or grabs a slot | Only paired phones get a slot; every UDP packet carries a MAC made with the session key |
 | A phone tries to change the mode | Phones have no message that sets the mode; the PC ignores anything else |
 | Replayed packets | Sequence numbers must increase; the session key changes on every join |
-| Guessing the pairing code online | 5 wrong tries make a new code; a code expires after 5 minutes and works only while the PC shows it |
-| Someone records the pairing exchange and brute-forces the 6-digit code offline | Accepted for v1 (LAN only, short window); v2 moves pairing to SPAKE2 |
+| Guessing the pairing code online | 5 wrong tries make a new code; a code expires after 5 minutes, works only while the PC shows it, and is used up by a successful pairing |
+| Someone records the pairing exchange and brute-forces the 6-digit code offline | Accepted for v1 (LAN only, short window). The recovered code is already used up, and the PC makes a fresh key pair for each pairing, so a replayed `pair` fails. v2 moves pairing to SPAKE2 |
 | Keys stolen from disk | Stored in iOS Keychain, Android Keystore and Windows DPAPI |
 | Exposure to the internet | Firewall rules on the Private profile only; no UPnP port mapping |
 

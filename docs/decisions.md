@@ -15,6 +15,29 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — Protocol details the design leaves open, fixed in protocol/SPEC.md
+- **Iteration:** 2.1
+- **Context:** Writing byte-exact shared vectors needs choices that "Networking protocol" doesn't make. The session key comes from "both nonces", but only the PC's `challenge` sends one, and a new phone's pairing path has none. HKDF's salt and info aren't given, and neither are the encodings of keys, proofs and MACs in JSON. Exact field names, value formats and validation are missing, as are the DualShock 4 stick formula and what the hat does when opposite d-pad bits are both set. The iteration's review also found three gaps. Packets were dropped against the last sequence "seen", so one forged packet with sequence 0xFFFFFFFF would make the PC drop all real input. A pairing code was never used up: a passive listener can recover it from one `pair` message in about 10^6 HMACs, then pair their own phone while the PC still shows the code. And nothing said which messages may come when, so a `hello` with someone else's `deviceId`, sent in clear, could kick them.
+- **Decision:**
+  - **Nonces.** `hello` carries the phone's 16-byte `nonce`, and `pair_required` carries a PC `nonce` as `challenge` does. Both join paths then have both nonces, with no extra round trip.
+  - **Keys.** Pairing key = HKDF-SHA256(X25519 secret, a salt of 32 zero bytes, info `padlink/1 pairing` ‖ PC key ‖ phone key). Session key = HKDF-SHA256(pairing key, the same salt, info `padlink/1 session` ‖ PC nonce ‖ phone nonce). Proof is keyed by the code's 6 ASCII digits, over PC key ‖ phone key. An all-zero X25519 secret is refused.
+  - **Pairing.** The PC makes a fresh X25519 key pair for each `pair_required`, and a successful `pair` uses the code up. Until `welcome`, only the expected next message (plus `ping`, `pong`, `error` and `bye`) is accepted. A new connection for a `deviceId` that holds a slot takes it over only after passing `pair` or `auth`.
+  - **Sequence.** Packets are compared with the last sequence the PC *accepted*, in RFC 1982 serial-number order, so the u32 wraps. That keeps the design's "sequence wrap at 2^32" test. `input.json` gains `sequenceOrder` cases.
+  - **JSON.** Messages are flat objects with a `type` field. Byte strings are strict padded base64, `slot` is 0–15 on the wire, `colour` is `#RRGGBB`, `proto` is 1 to 2^31−1, and unknown fields and types are ignored. Senders escape only what JSON requires; in C#, that means `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`. With the default encoder, the 4096-byte limit vector grows to 4101 bytes. The relaxed encoder still escapes emoji, so control-frame vectors are compared by decoding, not byte for byte.
+  - **Error codes.** The first set is `unsupported_proto`, `bad_message`, `bad_proof`, `bad_auth` and `full`.
+  - **Mapping.** DualShock 4 sticks: X = `(v + 32768) >> 8`, Y = `(min(-v, 32767) + 32768) >> 8`, so 0 maps to 128 on both axes. Opposite d-pad directions cancel before the hat value is picked. Xbox 360 pads get the d-pad bits as sent, as the design says.
+- **Alternatives:**
+  - A phone nonce in `auth` instead of `hello`. Rejected: the pairing path sends no `auth`, so it would still lack one.
+  - A `challenge` after every pairing as well. Rejected: an extra round trip to get a nonce that `pair_required` can carry.
+  - Hex instead of base64. Not chosen: longer, and both .NET and Dart have base64 built in.
+  - For the Y axis, `255 - X byte`. Rejected: it puts the centre at 127.
+  - A plain unsigned sequence compare with no wrap. Rejected: it drops the design's wrap test for no gain, since the MAC check already stops forged packets.
+  - Making the 4096-byte vector decode-only, instead of requiring minimal escaping. Rejected: a C# phone-name frame could then pass the tests and still go over the limit on the wire.
+- **Design change:**
+  - "Networking protocol": points to protocol/SPEC.md. `hello` and `pair_required` gain a nonce, in the join sequence and the message table. Step 4 names where each nonce comes from. The sequence rule says "accepted" and serial-number order.
+  - "Virtual controller layer": the d-pad row says opposite directions cancel.
+  - "Security and privacy": the online-guessing row adds that a successful pairing uses the code up. The offline brute-force row adds that the code is used up, and that the PC's fresh key pair per pairing makes a replayed `pair` fail.
+
 ### 2026-10-20 — Target games: PICO PARK 2, Brawlhalla and Gang Beasts
 - **Iteration:** 1.4
 - **Context:** The design leaves the 3 target games open ("Open questions"). Its rules ask for at least one Steam game that uses the Steam Input API directly and one that reads XInput. Gate M2 (PLAN.md 3.8) also needs one that supports 8 local players.

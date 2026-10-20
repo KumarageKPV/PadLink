@@ -1,0 +1,200 @@
+{
+  "description": "Phone input to pad reports (protocol/SPEC.md, Mapping to pad reports). sticks: an int16 stick value, what the Xbox 360 report gets (passed through), and the DualShock 4 byte for an X axis and for a Y axis. dpad: every combination of the 4 d-pad bits and the DualShock 4 hat value (0 north, clockwise to 7 north-west, 8 neutral); opposite directions cancel. Xbox 360 pads get the d-pad bits as they are.",
+  "sticks": [
+    {
+      "value": -32768,
+      "x360": -32768,
+      "ds4X": 0,
+      "ds4Y": 255
+    },
+    {
+      "value": -32767,
+      "x360": -32767,
+      "ds4X": 0,
+      "ds4Y": 255
+    },
+    {
+      "value": -257,
+      "x360": -257,
+      "ds4X": 126,
+      "ds4Y": 129
+    },
+    {
+      "value": -256,
+      "x360": -256,
+      "ds4X": 127,
+      "ds4Y": 129
+    },
+    {
+      "value": -255,
+      "x360": -255,
+      "ds4X": 127,
+      "ds4Y": 128
+    },
+    {
+      "value": -1,
+      "x360": -1,
+      "ds4X": 127,
+      "ds4Y": 128
+    },
+    {
+      "value": 0,
+      "x360": 0,
+      "ds4X": 128,
+      "ds4Y": 128
+    },
+    {
+      "value": 1,
+      "x360": 1,
+      "ds4X": 128,
+      "ds4Y": 127
+    },
+    {
+      "value": 255,
+      "x360": 255,
+      "ds4X": 128,
+      "ds4Y": 127
+    },
+    {
+      "value": 256,
+      "x360": 256,
+      "ds4X": 129,
+      "ds4Y": 127
+    },
+    {
+      "value": 32767,
+      "x360": 32767,
+      "ds4X": 255,
+      "ds4Y": 0
+    }
+  ],
+  "dpad": [
+    {
+      "buttons": 0,
+      "pressed": [],
+      "ds4Hat": 8
+    },
+    {
+      "buttons": 2048,
+      "pressed": [
+        "dpadUp"
+      ],
+      "ds4Hat": 0
+    },
+    {
+      "buttons": 4096,
+      "pressed": [
+        "dpadDown"
+      ],
+      "ds4Hat": 4
+    },
+    {
+      "buttons": 6144,
+      "pressed": [
+        "dpadUp",
+        "dpadDown"
+      ],
+      "ds4Hat": 8
+    },
+    {
+      "buttons": 8192,
+      "pressed": [
+        "dpadLeft"
+      ],
+      "ds4Hat": 6
+    },
+    {
+      "buttons": 10240,
+      "pressed": [
+        "dpadUp",
+        "dpadLeft"
+      ],
+      "ds4Hat": 7
+    },
+    {
+      "buttons": 12288,
+      "pressed": [
+        "dpadDown",
+        "dpadLeft"
+      ],
+      "ds4Hat": 5
+    },
+    {
+      "buttons": 14336,
+      "pressed": [
+        "dpadUp",
+        "dpadDown",
+        "dpadLeft"
+      ],
+      "ds4Hat": 6
+    },
+    {
+      "buttons": 16384,
+      "pressed": [
+        "dpadRight"
+      ],
+      "ds4Hat": 2
+    },
+    {
+      "buttons": 18432,
+      "pressed": [
+        "dpadUp",
+        "dpadRight"
+      ],
+      "ds4Hat": 1
+    },
+    {
+      "buttons": 20480,
+      "pressed": [
+        "dpadDown",
+        "dpadRight"
+      ],
+      "ds4Hat": 3
+    },
+    {
+      "buttons": 22528,
+      "pressed": [
+        "dpadUp",
+        "dpadDown",
+        "dpadRight"
+      ],
+      "ds4Hat": 2
+    },
+    {
+      "buttons": 24576,
+      "pressed": [
+        "dpadLeft",
+        "dpadRight"
+      ],
+      "ds4Hat": 8
+    },
+    {
+      "buttons": 26624,
+      "pressed": [
+        "dpadUp",
+        "dpadLeft",
+        "dpadRight"
+      ],
+      "ds4Hat": 0
+    },
+    {
+      "buttons": 28672,
+      "pressed": [
+        "dpadDown",
+        "dpadLeft",
+        "dpadRight"
+      ],
+      "ds4Hat": 4
+    },
+    {
+      "buttons": 30720,
+      "pressed": [
+        "dpadUp",
+        "dpadDown",
+        "dpadLeft",
+        "dpadRight"
+      ],
+      "ds4Hat": 8
+    }
+  ]
+}

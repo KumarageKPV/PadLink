@@ -1,0 +1,104 @@
+{
+  "description": "Feedback packets (protocol/SPEC.md, Feedback packet), in the same format as input.json, with the same sessionKey.",
+  "sessionKey": "4e11cdd91194e73a78fcb185a00f465d5419063002a102540cef352d5d19bec5",
+  "valid": [
+    {
+      "name": "off",
+      "hex": "50010200000000000000008155fc4429ab692d",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 2,
+        "slot": 0,
+        "largeMotor": 0,
+        "smallMotor": 0,
+        "red": 0,
+        "green": 0,
+        "blue": 0,
+        "echoMs": 0,
+        "mac": "8155fc4429ab692d"
+      }
+    },
+    {
+      "name": "highest values",
+      "hex": "5001020fffffffffffffff70b840355d2242a3",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 2,
+        "slot": 15,
+        "largeMotor": 255,
+        "smallMotor": 255,
+        "red": 255,
+        "green": 255,
+        "blue": 255,
+        "echoMs": 65535,
+        "mac": "70b840355d2242a3"
+      }
+    },
+    {
+      "name": "typical",
+      "hex": "50010207c8281e90ff31d44319ca4f17a65e7b",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 2,
+        "slot": 7,
+        "largeMotor": 200,
+        "smallMotor": 40,
+        "red": 30,
+        "green": 144,
+        "blue": 255,
+        "echoMs": 54321,
+        "mac": "4319ca4f17a65e7b"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "one byte short",
+      "hex": "50010207c8281e90ff31d44319ca4f17a65e",
+      "reason": "length"
+    },
+    {
+      "name": "one byte long",
+      "hex": "50010207c8281e90ff31d44319ca4f17a65e7b00",
+      "reason": "length"
+    },
+    {
+      "name": "magic 0x51",
+      "hex": "51010207c8281e90ff31d4830434611206bf32",
+      "reason": "magic"
+    },
+    {
+      "name": "version 2",
+      "hex": "50020207c8281e90ff31d49c9f8c1b273970fc",
+      "reason": "version"
+    },
+    {
+      "name": "type 0x01",
+      "hex": "50010107c8281e90ff31d438306f1bdb65d752",
+      "reason": "type"
+    },
+    {
+      "name": "slot 16",
+      "hex": "50010210c8281e90ff31d4da6be62f988c6c67",
+      "reason": "slot"
+    },
+    {
+      "name": "mac with its last bit flipped",
+      "hex": "50010207c8281e90ff31d44319ca4f17a65e7a",
+      "reason": "mac"
+    },
+    {
+      "name": "mac made with the pairing key",
+      "hex": "50010207c8281e90ff31d4c46f232391f32f60",
+      "reason": "mac"
+    },
+    {
+      "name": "all-zero mac",
+      "hex": "50010207c8281e90ff31d40000000000000000",
+      "reason": "mac"
+    }
+  ]
+}

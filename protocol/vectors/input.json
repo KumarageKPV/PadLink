@@ -1,0 +1,287 @@
+{
+  "description": "Input packets (protocol/SPEC.md, Input packet). Every packet's mac uses sessionKey, the session key in crypto.json. Decoders must turn each valid hex into its fields (mac as hex), and encoders must turn the fields back into the same bytes. pressed names the bits set in buttons. Decoders must drop each invalid packet for its reason: length, magic, version, type, slot or mac. sequenceOrder says whether a sequence is newer than the last one accepted (null before the first), in serial-number order.",
+  "sessionKey": "4e11cdd91194e73a78fcb185a00f465d5419063002a102540cef352d5d19bec5",
+  "buttonBits": {
+    "faceBottom": 0,
+    "faceRight": 1,
+    "faceLeft": 2,
+    "faceTop": 3,
+    "shoulderLeft": 4,
+    "shoulderRight": 5,
+    "back": 6,
+    "start": 7,
+    "guide": 8,
+    "stickLeft": 9,
+    "stickRight": 10,
+    "dpadUp": 11,
+    "dpadDown": 12,
+    "dpadLeft": 13,
+    "dpadRight": 14,
+    "reserved": 15
+  },
+  "valid": [
+    {
+      "name": "neutral",
+      "hex": "50010100000000000000000000000000000000000000e4670afd02cc1874",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 0,
+        "sequence": 0,
+        "buttons": 0,
+        "lx": 0,
+        "ly": 0,
+        "rx": 0,
+        "ry": 0,
+        "lt": 0,
+        "rt": 0,
+        "sentMs": 0,
+        "mac": "e4670afd02cc1874"
+      },
+      "pressed": []
+    },
+    {
+      "name": "every button but reserved, highest values",
+      "hex": "5001010fffffffffff7fff7fff7fff7fff7fffffffff5d4214172a1b82c3",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 15,
+        "sequence": 4294967295,
+        "buttons": 32767,
+        "lx": 32767,
+        "ly": 32767,
+        "rx": 32767,
+        "ry": 32767,
+        "lt": 255,
+        "rt": 255,
+        "sentMs": 65535,
+        "mac": "5d4214172a1b82c3"
+      },
+      "pressed": [
+        "faceBottom",
+        "faceRight",
+        "faceLeft",
+        "faceTop",
+        "shoulderLeft",
+        "shoulderRight",
+        "back",
+        "start",
+        "guide",
+        "stickLeft",
+        "stickRight",
+        "dpadUp",
+        "dpadDown",
+        "dpadLeft",
+        "dpadRight"
+      ]
+    },
+    {
+      "name": "lowest stick values",
+      "hex": "50010101020000000000008000800080008000000000a4196e25d9336c21",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 1,
+        "sequence": 2,
+        "buttons": 0,
+        "lx": -32768,
+        "ly": -32768,
+        "rx": -32768,
+        "ry": -32768,
+        "lt": 0,
+        "rt": 0,
+        "sentMs": 0,
+        "mac": "a4196e25d9336c21"
+      },
+      "pressed": []
+    },
+    {
+      "name": "sticks one step off centre",
+      "hex": "50010102030000000000ffff01000100ffff00000000f5228026eb2a7852",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 2,
+        "sequence": 3,
+        "buttons": 0,
+        "lx": -1,
+        "ly": 1,
+        "rx": 1,
+        "ry": -1,
+        "lt": 0,
+        "rt": 0,
+        "sentMs": 0,
+        "mac": "f5228026eb2a7852"
+      },
+      "pressed": []
+    },
+    {
+      "name": "reserved bit set, which receivers ignore",
+      "hex": "50010103040000000080000000000000000000000000442a816b6ba1515c",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 3,
+        "sequence": 4,
+        "buttons": 32768,
+        "lx": 0,
+        "ly": 0,
+        "rx": 0,
+        "ry": 0,
+        "lt": 0,
+        "rt": 0,
+        "sentMs": 0,
+        "mac": "442a816b6ba1515c"
+      },
+      "pressed": [
+        "reserved"
+      ]
+    },
+    {
+      "name": "typical",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d449cee433292354de",
+      "fields": {
+        "magic": 80,
+        "version": 1,
+        "type": 1,
+        "slot": 7,
+        "sequence": 1234567,
+        "buttons": 10273,
+        "lx": 12345,
+        "ly": -23456,
+        "rx": -300,
+        "ry": 4000,
+        "lt": 128,
+        "rt": 1,
+        "sentMs": 54321,
+        "mac": "49cee433292354de"
+      },
+      "pressed": [
+        "faceBottom",
+        "shoulderRight",
+        "dpadUp",
+        "dpadLeft"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "name": "one byte short",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d449cee433292354",
+      "reason": "length"
+    },
+    {
+      "name": "one byte long",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d449cee433292354de00",
+      "reason": "length"
+    },
+    {
+      "name": "magic 0x51",
+      "hex": "5101010787d612002128393060a4d4fea00f800131d4be63365456c687ac",
+      "reason": "magic"
+    },
+    {
+      "name": "version 2",
+      "hex": "5002010787d612002128393060a4d4fea00f800131d488d06922324c4947",
+      "reason": "version"
+    },
+    {
+      "name": "type 0x02",
+      "hex": "5001020787d612002128393060a4d4fea00f800131d44f66b0a3e30a5e3b",
+      "reason": "type"
+    },
+    {
+      "name": "slot 16",
+      "hex": "5001011087d612002128393060a4d4fea00f800131d47923b0f0a0111534",
+      "reason": "slot"
+    },
+    {
+      "name": "mac with its last bit flipped",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d449cee433292354df",
+      "reason": "mac"
+    },
+    {
+      "name": "mac made with the pairing key",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d42d2b848d63bb734e",
+      "reason": "mac"
+    },
+    {
+      "name": "all-zero mac",
+      "hex": "5001010787d612002128393060a4d4fea00f800131d40000000000000000",
+      "reason": "mac"
+    }
+  ],
+  "sequenceOrder": [
+    {
+      "last": null,
+      "sequence": 0,
+      "newer": true
+    },
+    {
+      "last": null,
+      "sequence": 4294967295,
+      "newer": true
+    },
+    {
+      "last": 5,
+      "sequence": 6,
+      "newer": true
+    },
+    {
+      "last": 5,
+      "sequence": 1000,
+      "newer": true
+    },
+    {
+      "last": 5,
+      "sequence": 5,
+      "newer": false
+    },
+    {
+      "last": 5,
+      "sequence": 4,
+      "newer": false
+    },
+    {
+      "last": 4294967294,
+      "sequence": 4294967295,
+      "newer": true
+    },
+    {
+      "last": 4294967295,
+      "sequence": 0,
+      "newer": true
+    },
+    {
+      "last": 4294967295,
+      "sequence": 2147483646,
+      "newer": true
+    },
+    {
+      "last": 4294967295,
+      "sequence": 2147483647,
+      "newer": false
+    },
+    {
+      "last": 0,
+      "sequence": 4294967295,
+      "newer": false
+    },
+    {
+      "last": 0,
+      "sequence": 2147483647,
+      "newer": true
+    },
+    {
+      "last": 0,
+      "sequence": 2147483648,
+      "newer": false
+    }
+  ]
+}

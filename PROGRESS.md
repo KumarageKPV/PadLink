@@ -18,7 +18,7 @@ One box per PLAN.md iteration. `/next` works on the first unticked box; `/finish
 
 ## Phase 2 — Core (M1)
 
-- [ ] 2.1 Protocol spec and shared test vectors
+- [x] 2.1 Protocol spec and shared test vectors — 2026-10-20 — protocol/SPEC.md fills the design's gaps (nonces in hello and pair_required, HKDF labels, strict base64 JSON, DS4 stick and hat mapping, serial-number sequence order, single-use pairing code); tools/gen_vectors.py writes 5 vector files (31 valid, 57 invalid, 1 ignored); check_vectors.py diffs them, decodes each, and fails on any SPEC table field no vector uses
 - [ ] 2.2 C# solution and protocol library
 - [ ] 2.3 Dart protocol package
 - [ ] 2.4 Crypto on both sides
