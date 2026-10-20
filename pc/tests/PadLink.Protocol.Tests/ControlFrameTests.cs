@@ -12,6 +12,7 @@ public class ControlFrameTests
     private const string File = "control.json";
 
     public static TheoryData<string> Valid => Vectors.Names(File, "valid");
+    public static TheoryData<string> ValidInSenderForm => [.. NamesInSenderForm(inSenderForm: true)];
     public static TheoryData<string> Ignored => Vectors.Names(File, "ignored");
     public static TheoryData<string> Invalid => Vectors.Names(File, "invalid");
 
@@ -29,21 +30,31 @@ public class ControlFrameTests
     }
 
     // Senders write compact JSON, type first, fields in table order, escaping only what JSON requires. So
-    // where the vector's JSON is in that form, the bytes match too. Escapes for characters outside the
-    // Basic Multilingual Plane may differ, and some vectors show what other senders may write.
+    // where the vector's JSON is in that form, the bytes match too.
     [Theory]
-    [MemberData(nameof(Valid))]
+    [MemberData(nameof(ValidInSenderForm))]
     public void Encoding_matches_the_vector_bytes_when_its_json_is_in_sender_form(string name)
     {
         var vector = Vectors.Get(File, "valid", name);
-        var json = vector["json"]!.GetValue<string>();
-        if (json != SenderForm(vector["message"]!))
-            return;
 
         var frame = ControlFrame.Encode(Decode(Vectors.Hex(vector["frameHex"])));
 
-        Assert.Equal(json, Encoding.UTF8.GetString(frame.AsSpan(ControlFrame.HeaderSize)));
+        Assert.Equal(vector["json"]!.GetValue<string>(), Encoding.UTF8.GetString(frame.AsSpan(ControlFrame.HeaderSize)));
         Assert.Equal(Convert.ToHexStringLower(Vectors.Hex(vector["frameHex"])), Convert.ToHexStringLower(frame));
+    }
+
+    // The test above leaves out the vectors that show what other senders may write, and the one whose
+    // emoji System.Text.Json writes as a \u pair (protocol/SPEC.md, "Control messages", Rules). Pinned, so
+    // a vector that leaves sender form by mistake fails here rather than dropping out of that test.
+    [Fact]
+    public void Only_the_vectors_that_show_other_senders_or_an_emoji_are_not_in_sender_form()
+    {
+        Assert.Equal(
+            [
+                "an escaped surrogate pair", "fields in another order, with spaces", "hello with a non-ASCII name",
+                "names repeated only across objects", "unknown field",
+            ],
+            NamesInSenderForm(inSenderForm: false).Order(StringComparer.Ordinal));
     }
 
     [Theory]
@@ -313,6 +324,11 @@ public class ControlFrameTests
     private static JsonNode Json(ControlMessage message) => JsonNode.Parse(ControlFrame.Encode(message).AsSpan(ControlFrame.HeaderSize))!;
 
     private static string BodyText(ControlMessage message) => Encoding.UTF8.GetString(ControlFrame.Encode(message).AsSpan(ControlFrame.HeaderSize));
+
+    private static IEnumerable<string> NamesInSenderForm(bool inSenderForm) =>
+        from vector in Vectors.Group(File, "valid")
+        where (vector["json"]!.GetValue<string>() == SenderForm(vector["message"]!)) == inSenderForm
+        select vector["name"]!.GetValue<string>();
 
     private static string SenderForm(JsonNode message) =>
         message.ToJsonString(new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });

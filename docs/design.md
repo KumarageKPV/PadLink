@@ -346,7 +346,7 @@ Each phone uses two channels: TCP for pairing, settings and mode changes, and UD
 **Join sequence**
 
 1. Phone opens TCP to the PC and sends `hello` {proto, deviceId, deviceName, platform, appVersion, nonce}.
-2. New phone: PC replies `pair_required` with its X25519 public key and a nonce. Phone sends `pair` {phone X25519 public key, proof}, where proof = HMAC-SHA256(code, both public keys); the code itself never crosses the network. After 5 wrong codes the PC makes a new code. Both sides derive a pairing key with X25519 + HKDF-SHA256 and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI).
+2. New phone: PC replies `pair_required` with its X25519 public key and a nonce. Phone sends `pair` {phone X25519 public key, proof}, where proof = HMAC-SHA256(code, both public keys); the code itself never crosses the network. After 5 wrong codes no code works for 30 s, then the PC shows a new one. Both sides derive a pairing key with X25519 + HKDF-SHA256 and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI).
 3. Known phone: PC sends `challenge` {nonce}; phone answers `auth` {HMAC-SHA256(pairing key, nonce)}.
 4. PC sends `welcome` {slot, colour, mode, padType, udpPort}. `mode` is `mixed` or `all_ds4`; `padType` is `x360` or `ds4`. Both sides derive a per-session key from the pairing key and both nonces: the phone's from `hello`, and the PC's from `pair_required` or `challenge`.
 5. Phone starts sending UDP input packets; PC sends feedback packets back.
@@ -413,7 +413,7 @@ PadLink works only on the local network, takes input only from paired phones, an
 | Someone on the same Wi-Fi sends fake input or grabs a slot | Only paired phones get a slot; every UDP packet carries a MAC made with the session key |
 | A phone tries to change the mode | Phones have no message that sets the mode; the PC ignores anything else |
 | Replayed packets | Sequence numbers must increase; the session key changes on every join |
-| Guessing the pairing code online | 5 wrong tries make a new code; a code expires after 5 minutes, works only while the PC shows it, and is used up by a successful pairing |
+| Guessing the pairing code online | After 5 wrong tries no code works for 30 s, then a new one appears, so at most 10 guesses a minute; a code expires after 5 minutes, works only while the PC shows it, and is used up by a successful pairing |
 | Someone records the pairing exchange and brute-forces the 6-digit code offline | Accepted for v1 (LAN only, short window). The recovered code is already used up, and the PC makes a fresh key pair for each pairing, so a replayed `pair` fails. v2 moves pairing to SPAKE2 |
 | Keys stolen from disk | Stored in iOS Keychain, Android Keystore and Windows DPAPI |
 | Exposure to the internet | Firewall rules on the Private profile only; no UPnP port mapping |

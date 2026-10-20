@@ -713,11 +713,36 @@ def _crypto_vectors(values):
         "sessionKeyInfo": (SESSION_LABEL + PC_NONCE + PHONE_NONCE).hex(),
         "sessionKey": values["sessionKey"].hex(),
         "packetMac": {"data": typical[:-MAC_SIZE].hex(), "mac": typical[-MAC_SIZE:].hex()},
-        "rejectedPublicKeys": [
-            {"name": "zero", "publicKey": bytes(32).hex()},
-            {"name": "one, a point of order 4", "publicKey": (b"\x01" + bytes(31)).hex()},
-        ],
+        "rejectedPublicKeys": [{"name": name, "publicKey": key.hex()} for name, key in _rejected_public_keys()],
     }
+
+
+def _rejected_public_keys():
+    """Peer keys whose shared secret is all zero for any private key: the points of small order, and
+    the same u written as u + p or with bit 255 set, which X25519 ignores (RFC 7748 section 5)."""
+    p = 2**255 - 19
+
+    def u(value):
+        return value.to_bytes(KEY_SIZE, "little")
+
+    def top_bit(key):
+        return key[:-1] + bytes([key[-1] | 0x80])
+
+    order_8 = bytes.fromhex("e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800")
+    return [
+        ("zero", u(0)),
+        ("one, a point of order 4", u(1)),
+        ("a point of order 8", order_8),
+        ("the other point of order 8", bytes.fromhex("5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157")),
+        ("p - 1, a point of order 4 on the twist", u(p - 1)),
+        ("p, which is zero", u(p)),
+        ("p + 1, which is one", u(p + 1)),
+        ("zero with the top bit set", top_bit(u(0))),
+        ("one with the top bit set", top_bit(u(1))),
+        ("a point of order 8 with the top bit set", top_bit(order_8)),
+        ("p with the top bit set", top_bit(u(p))),
+        ("p + 1 with the top bit set", top_bit(u(p + 1))),
+    ]
 
 
 def generate():

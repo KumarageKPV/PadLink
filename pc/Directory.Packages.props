@@ -6,9 +6,13 @@
   <ItemGroup>
     <!-- X25519 only: .NET 10 has none (docs/decisions.md). HMAC and HKDF are built in. -->
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <!-- FakeTimeProvider, for code expiry, pings and the quiet timeout in tests. -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <!-- Virtual pads through ViGEmBus 1.22.0 (docs/design.md, Tech stack). It embeds the native client. -->
     <PackageVersion Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+    <!-- Windows DPAPI, which keeps the pairing keys (docs/design.md, Security and privacy). -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>

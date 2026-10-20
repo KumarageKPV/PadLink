@@ -6,7 +6,8 @@
         "type": "Project",
         "dependencies": {
           "Nefarius.ViGEm.Client": "[1.21.256, )",
-          "PadLink.Protocol": "[1.0.0, )"
+          "PadLink.Protocol": "[1.0.0, )",
+          "System.Security.Cryptography.ProtectedData": "[10.0.13, )"
         }
       },
       "padlink.protocol": {
@@ -26,6 +27,12 @@
         "requested": "[1.21.256, )",
         "resolved": "1.21.256",
         "contentHash": "VJMO6hkalOZ7YdXTwcR881aTgPZlN7thEs3x6CWE/kEu7SdE5bY7QuDXkR2eqXfPAee4NrxInIAqa45PorpTsA=="
+      },
+      "System.Security.Cryptography.ProtectedData": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "aUSmC6cPjFLSE0rDTsmkR3wvUOnscqewebOaaELEToh12sNmoltZqT3f0C81mJ1zhxKjWco25soHTvYwsXCsUw=="
       }
     }
   }

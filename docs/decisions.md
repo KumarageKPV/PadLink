@@ -15,6 +15,34 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — 5 wrong pairing codes start a 30-second cooldown
+- **Iteration:** 2.7
+- **Context:** The design's defence against online guessing was "5 wrong tries make a new code". That caps the tries per code, not the tries per second: each guess still has about a one-in-a-million chance. 2.7's reviewer pointed out that a host on the same Wi-Fi can open connections in parallel, and each try costs the PC about two X25519 operations. At thousands of tries a second it would pair within minutes while a code is shown, and the headless host (2.9) shows one all the time.
+- **Decision:** After the 5th wrong try, no code works for 30 seconds. `PairingCode.Current` is null and `IsCoolingDown` is true, every `pair` gets `bad_proof`, and none of those tries count. Then a new code appears. That caps guessing at 10 tries a minute, so finding the code takes about a month of nonstop tries on average. `Show` can't cut a cooldown short, and `Hide` during one keeps pairing off. A new code never repeats the last one.
+- **Alternatives:** Hide the code after 5 wrong tries until someone on the PC shows it again. Rejected: it's stronger, but one player who mistypes 5 times needs the PC user to step in, and the headless host would need a key for it. Leave it for the 4.6 security pass. Rejected: 2.9's host would show a weak code until then.
+- **Design change:** "Networking protocol", Join sequence step 2, and "Security and privacy", the online-guessing row. SPEC.md, "Join sequence" step 2, says the same.
+
+### 2026-10-20 — When each side stores the pairing key
+- **Iteration:** 2.7
+- **Context:** SPEC.md said both sides store the pairing key, but not when. The PC stores it as soon as the proof matches, before the slot manager can answer `full`. A phone that stored its key only on `welcome` would get `full`, and on its next try the PC would send `challenge`, which it couldn't answer. Nothing let that `deviceId` recover (from 2.7's review).
+- **Decision:** SPEC.md, "Join sequence": the PC stores the key once the proof matches, before it answers. The phone stores it once it has sent `pair`, and drops it on `bad_proof` or `bad_message`. A phone that gets `challenge` without a key for this PC starts over with a new `deviceId`. No bytes on the wire change, so the version stays 1.
+- **Alternatives:** The PC stores the key only after a `welcome`. Rejected: a `full` after a correct code would use the code up and leave the phone unpaired, so the player would need a new code. A message for "I lost my key". Rejected: it's a wire change, and a new `deviceId` already does the job.
+- **Design change:** none
+
+### 2026-10-20 — How the PC ends a control connection
+- **Iteration:** 2.7
+- **Context:** protocol/SPEC.md said that a `bad_message` closes the connection, but not whether `bad_proof`, `bad_auth`, `full` and `unsupported_proto` do. It also said nothing about a known message sent the wrong way, or what the old connection hears when a newer one takes its slot over. Each side pings every second, but nothing said what happens when the pings stop. A phone whose Wi-Fi dies sends no TCP close, so its connection could hold a socket, and before `welcome` a pending join, for as long as the PC runs. And closing a socket with unread bytes resets it, which can lose the last `error` or `bye` before the phone reads it.
+- **Decision:** Every `error` the PC sends ends the connection. A phone that typed a wrong code reconnects and sends `hello` again, so each `pair` meets a fresh PC key pair. A message sent in the wrong direction, such as `welcome` from a phone, is out of place: `bad_message`. The PC sends `bye` before closing a connection for a takeover or because it is shutting down. Each side closes a connection on which no frame has arrived for 5 s, before or after `welcome`; the PC's 5 s timer starts again with every frame. To the slot, that is a dropped TCP link, which moves it to Grace (3.1). To close, `ControlServer` sends what is queued, shuts its sending side, and reads until the phone closes too, for up to a second. It closes at once for a quiet link, or for a frame length of 0 or over 4096. A phone that stops reading while it keeps sending fills its outbox of 64 frames and is cut off. SPEC.md, "Join rules", says all this, except the outbox. No bytes on the wire change, so the version stays 1.
+- **Alternatives:** Let a phone retry `pair` on the same connection after `bad_proof`. Rejected: it reuses the PC's key pair, and the phone has to handle two retry paths. No quiet timeout, relying on TCP closes and on 3.1's 2 s of UDP silence. Rejected: dead connections would linger until a rejoin took them over. A connection that keeps pinging without joining still stays open; a limit on connections that haven't joined, or a deadline to join, is left to the 4.6 security pass. A shorter timeout, such as 3 s. Not chosen: 5 missed pings rides out a short Wi-Fi stall.
+- **Design change:** none (the design says each side pings every second and a dropped link moves the slot to Grace; SPEC.md now says when the link counts as dropped)
+
+### 2026-10-20 — v1 runs over IPv4 only
+- **Iteration:** 2.7
+- **Context:** The input receiver takes a slot's packets only from the IP of the phone's control connection (2.6's decision). With IPv6, a phone's privacy addresses can give its TCP and UDP sockets different source IPs, so its input would be dropped for `address`. The receiver can bind dual-mode, but nothing chose a family for the control listener and the receiver together (open from 2.6's review).
+- **Decision:** IPv4 for both. `ControlServer` (`pc/src/PadLink.Core/Control/ControlServer.cs`) takes only an IPv4 endpoint, so a phone's address is always IPv4. The host (2.9) binds both the listener and the receiver to IPv4 endpoints, such as 0.0.0.0. SPEC.md, "Ports and discovery", tells the phone to connect to an IPv4 address of the PC and send its input there. `InputReceiver` keeps its tested dual-mode binding, which the host doesn't use.
+- **Alternatives:** Dual-stack for both. Rejected for v1: the phone would have to pin one source IP for both sockets, and every LAN and phone hotspot the design targets has IPv4.
+- **Design change:** none (the design names no address family)
+
 ### 2026-10-20 — A slot's phone address is the IP of its control connection, on any port
 - **Iteration:** 2.6
 - **Context:** docs/design.md and protocol/SPEC.md drop input "from an address that is not the slot's phone" without saying what that address is (open from 2.1's review). A phone's UDP source port changes when its app recreates the socket, while its IP stays the same. The mac and the sequence check are what stop forged and replayed packets. The address check is an extra filter, done before the mac so a flood from other hosts costs no HMAC.

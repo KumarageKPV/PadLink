@@ -25,8 +25,11 @@ public class CryptoTests
     [Fact]
     public void Both_sides_agree_on_the_vector_shared_secret()
     {
-        Assert.True(Pc.TryAgree(Phone.PublicKey, out var pcSecret));
-        Assert.True(Phone.TryAgree(Pc.PublicKey, out var phoneSecret));
+        var pcSecret = new byte[X25519KeyPair.KeySize];
+        var phoneSecret = new byte[X25519KeyPair.KeySize];
+
+        Assert.True(Pc.TryAgree(Phone.PublicKey, pcSecret));
+        Assert.True(Phone.TryAgree(Pc.PublicKey, phoneSecret));
 
         Assert.Equal(Hex("sharedSecret"), Convert.ToHexStringLower(pcSecret));
         Assert.Equal(Hex("sharedSecret"), Convert.ToHexStringLower(phoneSecret));
@@ -37,11 +40,13 @@ public class CryptoTests
     public void Public_key_with_an_all_zero_shared_secret_is_refused(string name)
     {
         var key = Vectors.Hex(Vectors.Get(File, "rejectedPublicKeys", name)["publicKey"]);
+        var pcSecret = Filled(0xFF);
+        var phoneSecret = Filled(0xFF);
 
-        Assert.False(Pc.TryAgree(key, out var pcSecret));
-        Assert.False(Phone.TryAgree(key, out var phoneSecret));
-        Assert.Null(pcSecret);
-        Assert.Null(phoneSecret);
+        Assert.False(Pc.TryAgree(key, pcSecret));
+        Assert.False(Phone.TryAgree(key, phoneSecret));
+        Assert.Equal(new byte[X25519KeyPair.KeySize], pcSecret);
+        Assert.Equal(new byte[X25519KeyPair.KeySize], phoneSecret);
     }
 
     [Fact]
@@ -138,13 +143,27 @@ public class CryptoTests
     [Fact]
     public void Fresh_key_pairs_agree_with_each_other()
     {
-        var pc = X25519KeyPair.Generate();
-        var phone = X25519KeyPair.Generate();
+        using var pc = X25519KeyPair.Generate();
+        using var phone = X25519KeyPair.Generate();
+        var pcSecret = new byte[X25519KeyPair.KeySize];
+        var phoneSecret = new byte[X25519KeyPair.KeySize];
 
-        Assert.True(pc.TryAgree(phone.PublicKey, out var pcSecret));
-        Assert.True(phone.TryAgree(pc.PublicKey, out var phoneSecret));
+        Assert.True(pc.TryAgree(phone.PublicKey, pcSecret));
+        Assert.True(phone.TryAgree(pc.PublicKey, phoneSecret));
         Assert.Equal(pcSecret, phoneSecret);
         Assert.NotEqual(pc.PublicKey.ToArray(), phone.PublicKey.ToArray());
+    }
+
+    [Fact]
+    public void Dispose_clears_the_private_key_and_ends_agreement()
+    {
+        var pair = X25519KeyPair.FromPrivateKey(Value("pc", "privateKey"));
+
+        pair.Dispose();
+        pair.Dispose();
+
+        Assert.Equal(new byte[X25519KeyPair.KeySize], pair.PrivateKey.ToArray());
+        Assert.Throws<ObjectDisposedException>(() => pair.TryAgree(Phone.PublicKey, new byte[X25519KeyPair.KeySize]));
     }
 
     [Fact]
@@ -164,7 +183,8 @@ public class CryptoTests
         var nonce15 = new byte[15];
 
         Assert.Throws<ArgumentException>(() => X25519KeyPair.FromPrivateKey(key31));
-        Assert.Throws<ArgumentException>(() => Pc.TryAgree(key31, out _));
+        Assert.Throws<ArgumentException>(() => Pc.TryAgree(key31, new byte[X25519KeyPair.KeySize]));
+        Assert.Throws<ArgumentException>(() => Pc.TryAgree(Phone.PublicKey, key31));
         Assert.Throws<ArgumentException>(() => JoinKeys.Proof(Code, key31, Phone.PublicKey));
         Assert.Throws<ArgumentException>(() => JoinKeys.PairingKey(key31, Pc.PublicKey, Phone.PublicKey));
         Assert.Throws<ArgumentException>(() => JoinKeys.AuthMac(Value("pairingKey"), nonce15));
@@ -182,6 +202,8 @@ public class CryptoTests
     }
 
     private static string Hex(params string[] path) => Convert.ToHexStringLower(Value(path));
+
+    private static byte[] Filled(byte value) => Enumerable.Repeat(value, X25519KeyPair.KeySize).ToArray();
 
     private static IEnumerable<byte[]> EachBitFlipped(byte[] bytes) =>
         Enumerable.Range(0, bytes.Length * 8).Select(bit => Vectors.Flipped(bytes, bit));

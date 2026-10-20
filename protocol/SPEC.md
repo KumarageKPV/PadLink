@@ -18,12 +18,13 @@ This is the contract between the phone app and the PC companion. It is the "Netw
 - The PC listens on TCP 47820 (control) and UDP 47821 (input); both are configurable. The PC answers each phone from UDP 47821 to the phone's source port.
 - Bonjour service type `_padlink._tcp`; TXT record `proto=1`, `name=<PC name>`, `id=<random install id>`.
 - QR payload: `padlink://<PC IP>:47820?code=<6 digits>&id=<install id>`.
+- Version 1 runs over IPv4 only. The PC listens on its IPv4 addresses, and the phone connects to an IPv4 address of the PC, from the Bonjour record or the QR code, and sends its input there too.
 
 ## Join sequence
 
 1. The phone opens TCP to the PC and sends `hello`, which carries a fresh 16-byte phone `nonce`.
-2. New phone: the PC replies `pair_required` with a fresh X25519 public `key`, from a key pair it makes for this pairing, and a fresh 16-byte PC `nonce`. The phone sends `pair` with its own fresh X25519 public `key` and the `proof`; the code itself never crosses the network. After 5 wrong codes the PC makes a new code, and a successful `pair` uses the code up, so the PC shows a new one. Both sides derive the pairing key and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI).
-3. Known phone: the PC sends `challenge` with a fresh 16-byte PC `nonce`; the phone answers `auth` with the auth `mac`.
+2. New phone: the PC replies `pair_required` with a fresh X25519 public `key`, from a key pair it makes for this pairing, and a fresh 16-byte PC `nonce`. The phone sends `pair` with its own fresh X25519 public `key` and the `proof`; the code itself never crosses the network. After 5 wrong codes, no code works for 30 seconds, and then the PC shows a new one. A successful `pair` uses the code up, so the PC shows a new one then too. Both sides derive the pairing key and store it (phone: Keychain / Android Keystore; PC: Windows DPAPI). The PC stores it once the proof matches, before it answers, so a phone that then gets `full` stays paired. The phone stores it once it has sent `pair`, and drops it if the answer is `error` with `bad_proof` or `bad_message`.
+3. Known phone: the PC sends `challenge` with a fresh 16-byte PC `nonce`; the phone answers `auth` with the auth `mac`. A phone that gets `challenge` but holds no pairing key for this PC can't answer it: it starts over with a new `deviceId`, which the PC treats as a new phone.
 4. The PC sends `welcome`. Both sides derive the session key from the pairing key, the PC's nonce (from `pair_required` or `challenge`) and the phone's (from `hello`).
 5. The phone starts sending UDP input packets; the PC sends feedback packets back. Both carry a `mac` made with the session key.
 6. Either side sends `bye` to leave. A dropped TCP link or 2 s of UDP silence moves the slot to Grace.
@@ -32,7 +33,10 @@ Nonces and key pairs come from a cryptographically secure random generator, new 
 
 **Join rules**
 
-- Until `welcome`, each side accepts only the message the sequence expects next, plus `ping`, `pong`, `error` and `bye` at any time. After `welcome`, `hello`, `pair_required`, `pair`, `challenge` and `auth` are out of place. An out-of-place message gets `error` with code `bad_message`, and the connection closes.
+- Until `welcome`, each side accepts only the message the sequence expects next, plus `ping`, `pong`, `error` and `bye` at any time, and ignores messages of a type it doesn't know, as at any other time. After `welcome`, `hello`, `pair_required`, `pair`, `challenge` and `auth` are out of place. So is a message sent in the wrong direction, such as a `welcome` from a phone. An out-of-place message gets `error` with code `bad_message`, and the connection closes.
+- Every `error` the PC sends ends the connection: it closes the connection after sending it. A phone that gets `bad_proof` starts again with a new connection and `hello`, so it also gets a fresh PC key pair.
+- When the PC ends a working connection itself, for a takeover or because it is shutting down, it sends `bye` first. It sends nothing before closing a connection that went quiet (below), or one whose frame length is 0 or over 4096 ("Control messages").
+- Each side closes the connection when no frame has arrived on it for 5 seconds. The other side's pings, every second, keep a live connection open. For the slot, this counts as a dropped TCP link.
 - A new connection for a `deviceId` that already holds a slot changes nothing until it passes `pair` or `auth`. Only then does the PC close the old connection and move the slot to the new one, so a `hello` with someone else's `deviceId` can't kick them.
 - A `pair` whose `key` gives an all-zero shared secret gets `error` with code `bad_message`.
 
