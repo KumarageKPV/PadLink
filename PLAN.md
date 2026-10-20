@@ -336,8 +336,10 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 2.3 Dart protocol package
 - **Depends on:** 2.1
 - **Design:** Networking protocol
-- **Task:** Create `mobile/packages/padlink_protocol` with the same packets, button bits, framing and stick mapping, using `ByteData`. Tests load the same `protocol/vectors/*.json` (path relative to the repo root).
-- **Done when:** `dart test` passes on every vector.
+- **Task:** Create `mobile/packages/padlink_protocol` with the same packets, button bits, framing and stick mapping, using `ByteData`. Tests load the same `protocol/vectors/*.json` (path relative to the repo root). First settle two rules from 2.2's review, where the C# and Python decoders disagree with Dart. For each, add the rule to protocol/SPEC.md, a vector in `tools/gen_vectors.py`, the C# check in `pc/src/PadLink.Protocol/Control/` and a docs/decisions.md entry, all in this iteration's commit (CLAUDE.md's protocol change order). Neither changes what valid senders write, so the version stays 1.
+  - **Repeated field names.** SPEC.md doesn't say what `{"type":"battery","pct":"x","pct":5}` means. Python's `json.loads` and Dart's `jsonDecode` keep the last copy and accept it. C# reads each copy as it comes, so the bad first one makes it `bad_message`. The review suggests making a repeated top-level name `bad_message`, as I-JSON (RFC 7493) does: reject it in C#'s first pass over the body (`ControlFrame.Scan`), and in Python with an `object_pairs_hook`. Dart's `jsonDecode` drops the earlier copies, so check how Dart can see them before picking. If repeats become `bad_message`, 2.2's C# test that a repeated `type` takes the last one changes too.
+  - **Base64 padding bits.** The bits before `=` that no byte uses may be non-zero: a 16-byte nonce ending `…urx==` decodes to the same bytes as `…urw==`. C#'s `Convert.FromBase64String` and Python's `b64decode` accept it; Dart 3.13.5's `base64.decode` throws `FormatException`. The review suggests that SPEC.md require those bits to be zero (RFC 4648 section 3.5 lets decoders reject them), with an invalid vector. C# and Python then check that re-encoding the decoded bytes gives the same text.
+- **Done when:** `dart test` passes on every vector, including the new ones, and `/verify` passes for C# and the vectors.
 - **Commit:** `mobile: Dart protocol package with vector tests`
 
 #### 2.4 Crypto on both sides
