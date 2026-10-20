@@ -324,7 +324,12 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 2.2 C# solution and protocol library
 - **Depends on:** 2.1
 - **Design:** Networking protocol; Tech stack
-- **Task:** Create `pc/PadLink.sln` targeting `net10.0` with the projects from section 3 (empty for now except Protocol) and matching xUnit test projects. In `PadLink.Protocol`, implement the input and feedback packets as `readonly struct`s with span-based `TryRead`/`Write` (no allocations), button bit constants, control-message framing (u32 length + UTF-8 JSON, 4 KB max) with System.Text.Json source generation. Tests load `protocol/vectors/*.json`.
+- **Task:** Create `pc/PadLink.sln` targeting `net10.0` with the projects from section 3 (empty for now except Protocol) and matching xUnit test projects. In `PadLink.Protocol`, implement the input and feedback packets as `readonly struct`s with span-based `TryRead`/`Write` (no allocations), button bit constants, control-message framing (u32 length + UTF-8 JSON, 4 KB max) with System.Text.Json source generation. Tests load `protocol/vectors/*.json`. Follow protocol/SPEC.md, "Control messages", where 2.1's review found C# traps:
+  - Build the context with `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`, or the 4096-byte vector grows past the limit.
+  - .NET's base64 decoders accept spaces, so check the text first.
+  - System.Text.Json doesn't check UTF-8 in values it skips, so validate the whole body first.
+  - It binds `null` to a string without error.
+  - Lone UTF-16 surrogates (`"\ud800"`) have no vector yet: Python's reference decoder accepts them, and System.Text.Json's `GetString` throws. Pick a rule (likely `bad_message`), and add it to SPEC.md and an invalid vector in `tools/gen_vectors.py`, in the same commit.
 - **Done when:** every vector round-trips in tests; a benchmark test shows decoding allocates 0 bytes (`GC.GetAllocatedBytesForCurrentThread`).
 - **Commit:** `pc: protocol library with vector tests`
 
@@ -353,13 +358,21 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 - **Depends on:** 2.4, 2.5
 - **Design:** Networking protocol (Rules); Performance and latency budget
 - **Task:** One UDP socket on 47821 on an above-normal-priority thread with a pooled buffer. Per packet: check magic, version, slot, source address and MAC; drop non-newer sequences; submit to the backend only when state changed; record sentMs for round-trip timing.
+  - **Sequences:** follow protocol/SPEC.md, "Packet rules". A packet is compared with the last one *accepted*, so only packets that pass every other check move the mark. The comparison is serial-number order, and the u32 wraps. `input.json`'s `sequenceOrder` cases are the test.
+  - **Source address:** SPEC.md doesn't yet define the slot's address. It could be the IP alone, or the IP and port of the first accepted packet; a phone's port changes if its app recreates the socket. Choose one, write it into SPEC.md's packet rules, and add a docs/decisions.md entry (open from 2.1's review).
 - **Done when:** loopback tests cover valid, wrong MAC, wrong address, replayed, reordered and gapped packets; a test sends 120 packets a second from 16 fake slots for 10 s with 0 bytes allocated per packet after warm-up.
 - **Commit:** `core: UDP input receiver`
 
 #### 2.7 TCP control server and pairing
 - **Depends on:** 2.4
 - **Design:** Networking protocol (Join sequence, Control messages); Security and privacy
-- **Task:** TCP listener on 47820, one connection per phone, framed JSON. Implement the join state machine: hello → pair_required/pair or challenge/auth → welcome; 6-digit codes that expire after 5 minutes and regenerate after 5 wrong tries; pairing keys stored with DPAPI (System.Security.Cryptography.ProtectedData); ping/pong every second; bye; 4 KB frame limit.
+- **Task:** TCP listener on 47820, one connection per phone, framed JSON. Implement the join state machine: hello → pair_required/pair or challenge/auth → welcome; 6-digit codes that expire after 5 minutes and regenerate after 5 wrong tries; pairing keys stored with DPAPI (System.Security.Cryptography.ProtectedData); ping/pong every second; bye; 4 KB frame limit. Also follow protocol/SPEC.md, "Join sequence" and "Join rules", added in 2.1's review:
+  - A fresh X25519 key pair for each `pair_required`.
+  - A successful `pair` uses the code up.
+  - Until `welcome`, accept only the expected next message, plus ping, pong, error and bye.
+  - A new connection for a `deviceId` that holds a slot takes it over only after passing `pair` or `auth`.
+  - An all-zero shared secret gets `bad_message`.
+  - Check a frame's length from its 4-byte header before reading the body.
 - **Done when:** state-machine tests cover every message in both orders that matter, an expired code, five wrong codes, an oversize frame and a dropped connection.
 - **Commit:** `core: control server and pairing`
 
@@ -380,7 +393,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 2.10 PC discovery
 - **Depends on:** 2.9
 - **Design:** Networking protocol (Ports and discovery); PC companion app design
-- **Task:** Advertise `_padlink._tcp` on 47820 with TXT `proto=1`, `name`, `id` using Windows `DnsServiceRegister` through P/Invoke; unregister on exit. Generate the QR payload string.
+- **Task:** Advertise `_padlink._tcp` on 47820 with TXT `proto=1`, `name`, `id` using Windows `DnsServiceRegister` through P/Invoke; unregister on exit. Generate the QR payload string. docs/design.md disagrees with itself here: "Networking protocol" and protocol/SPEC.md put `id` in both the TXT record and the QR payload. "PC companion app design" leaves it out of both: the Discovery module row, and the QR code in "Main window". Align those two places with SPEC.md (open from 2.1's review).
 - **Done when:** a Python browse script using the `zeroconf` package finds the service with the right TXT record while the host runs.
 - **Commit:** `pc: Bonjour advertising`
 
@@ -515,7 +528,7 @@ Spike code lives in `spike/`, is throwaway, and nothing outside it may import fr
 #### 4.6 Security pass
 - **Depends on:** 2.7, 2.6
 - **Design:** Security and privacy
-- **Task:** Re-check code expiry, attempt limits and key storage; add a randomized fuzz test for the UDP parser and the frame reader (10 million inputs, no exceptions, no allocations on the drop path); confirm a phone can't change the mode. Ask the reviewer subagent for a security-only review of the pairing and packet code.
+- **Task:** Re-check code expiry, attempt limits and key storage; add a randomized fuzz test for the UDP parser and the frame reader (10 million inputs, no exceptions, no allocations on the drop path); confirm a phone can't change the mode. Ask the reviewer subagent for a security-only review of the pairing and packet code. Feedback packets carry no sequence, so a feedback packet can be replayed within a session, for example full rumble. The threat table's replay row covers input only. Either add the threat and its acceptance to "Security and privacy", or add a sequence to feedback. That is a wire change: bump the packet version and follow the protocol change order in CLAUDE.md (open from 2.1's review).
 - **Done when:** fuzz tests pass and every reviewer finding is fixed or recorded in `docs/decisions.md`.
 - **Commit:** `security: hardening pass`
 
