@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Receiver, control server, slots, modes and pad backends. Empty until PLAN.md 2.5. -->
+  <ItemGroup>
+    <ProjectReference Include="..\PadLink.Protocol\PadLink.Protocol.csproj" />
+  </ItemGroup>
+</Project>

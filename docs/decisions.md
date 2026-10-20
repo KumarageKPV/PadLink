@@ -15,6 +15,20 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — A lone surrogate escape in a control message is bad_message
+- **Iteration:** 2.2
+- **Context:** JSON lets a string escape a UTF-16 surrogate on its own (`"\ud800"`). Such a string has no UTF-8 form, and readers disagree: Python's `json.loads` and Dart's `jsonDecode` accept it, while System.Text.Json's `GetString` throws. 2.1's review left this without a rule or a vector.
+- **Decision:** A surrogate escape must be a high one followed at once by an escaped low one. A lone or reversed one gets `bad_message` with reason `utf8`, anywhere in the body: names, values, and fields the receiver skips. That matches the existing rule that the whole body must be UTF-8, and I-JSON (RFC 7493), which forbids surrogates in strings. `tools/gen_vectors.py` rejects them, `control.json` gains 4 invalid vectors and a valid escaped pair, and SPEC.md says Python and Dart need their own check. C# finds them in its first pass over the body, before any field is bound. Not a wire change, so the version stays 1: valid senders write the same bytes.
+- **Alternatives:** Only check the fields a receiver reads. Rejected: senders could then put text in skipped fields that one reader keeps and another refuses, which is the gap the UTF-8 rule already closed. Replace them with U+FFFD. Rejected: two receivers could then see different strings.
+- **Design change:** none (protocol/SPEC.md holds byte-level rules)
+
+### 2026-10-20 — PC solution: xunit.v3 through VSTest, lock files, test projects as code arrives
+- **Iteration:** 2.2
+- **Context:** PLAN.md 2.2 asks for the section 3 projects, "matching xUnit test projects", and the design says to pin versions in lock files. The .NET 10 SDK's `dotnet new sln` now writes `.slnx`, and its xUnit template uses xunit 2.
+- **Decision:** `pc/PadLink.sln` stays a classic `.sln`, which is CI's marker file. Packages are pinned in `pc/Directory.Packages.props`, and every project has a `packages.lock.json`; CI restores in locked mode. Tests use xunit.v3 3.2.2 run through VSTest, so `--filter "Category!=RequiresViGEm"` works as CLAUDE.md writes it. Only `PadLink.Protocol.Tests` exists now. Each other test project comes with the first code in its project (Core in 2.5, Simulator in 2.8, Host in 2.9, Desktop in 3.5). Host and Simulator stay class libraries until then, since an empty Exe doesn't build.
+- **Alternatives:** Empty test projects for every project now. Not done: four projects with no tests to run. xunit.v3 4.0. Not chosen: a new major version, and nothing in it is needed here.
+- **Design change:** none
+
 ### 2026-10-20 — Protocol details the design leaves open, fixed in protocol/SPEC.md
 - **Iteration:** 2.1
 - **Context:** Writing byte-exact shared vectors needs choices that "Networking protocol" doesn't make. The session key comes from "both nonces", but only the PC's `challenge` sends one, and a new phone's pairing path has none. HKDF's salt and info aren't given, and neither are the encodings of keys, proofs and MACs in JSON. Exact field names, value formats and validation are missing, as are the DualShock 4 stick formula and what the hat does when opposite d-pad bits are both set. The iteration's review also found three gaps. Packets were dropped against the last sequence "seen", so one forged packet with sequence 0xFFFFFFFF would make the PC drop all real input. A pairing code was never used up: a passive listener can recover it from one `pair` message in about 10^6 HMACs, then pair their own phone while the PC still shows the code. And nothing said which messages may come when, so a `hello` with someone else's `deviceId`, sent in clear, could kick them.

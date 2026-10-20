@@ -258,6 +258,32 @@ class FramingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gv.frame({"type": "error", "code": "x" * (4097 - shell)})
 
+    def test_an_escaped_surrogate_pair_is_one_character(self):
+        message = gv.decode_frame(raw_frame(b'{"type":"error","code":"\\ud83c\\udfae"}'))
+        self.assertEqual(message["code"], "\U0001f3ae")
+
+    def test_a_lone_surrogate_escape_is_not_utf8_anywhere_in_the_body(self):
+        frames = [
+            raw_frame(b'{"type":"error","code":"\\ud800"}'),  # high, with no low after it
+            raw_frame(b'{"type":"error","code":"a\\udc00"}'),  # low, with no high before it
+            raw_frame(b'{"type":"error","code":"\\udc00\\ud800"}'),  # a pair the wrong way round
+            raw_frame(b'{"type":"battery","pct":5,"x":["\\ud800"]}'),  # in a field the receiver skips
+            raw_frame(b'{"type":"battery","pct":5,"\\ud800":1}'),  # in a field name
+        ]
+        for data in frames:
+            with self.subTest(frame=data[4:]):
+                with self.assertRaises(gv.DecodeError) as caught:
+                    gv.decode_frame(data)
+                self.assertEqual(caught.exception.reason, "utf8")
+        with self.assertRaises(ValueError):
+            gv.frame({"type": "error", "code": "\ud800"})
+
+    def test_the_surrogate_check_handles_the_deepest_nesting_a_frame_can_hold(self):
+        shell = len('{"type":"ping","x":}')
+        depth = (4096 - shell) // 2
+        deep = raw_frame(b'{"type":"ping","x":' + b"[" * depth + b"]" * depth + b"}")
+        self.assertEqual(gv.decode_frame(deep), {"type": "ping"})
+
     def test_rejects_each_fault_with_its_reason(self):
         welcome = {"type": "welcome", "slot": 0, "colour": "#1E90FF", "mode": "mixed", "padType": "x360",
                    "udpPort": 47821}

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless console host. Empty until PLAN.md 2.9, which makes it an Exe: an empty Exe doesn't build. -->
+  <ItemGroup>
+    <ProjectReference Include="..\PadLink.Core\PadLink.Core.csproj" />
+  </ItemGroup>
+</Project>

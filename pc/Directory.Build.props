@@ -1,0 +1,12 @@
+<Project>
+  <!-- Settings every project in pc/ shares. Package versions live in Directory.Packages.props. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- packages.lock.json pins transitive packages too (docs/design.md, Tech stack). CI sets CI=true,
+         so a lock file that doesn't match the project fails the build there instead of being rewritten. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
+</Project>

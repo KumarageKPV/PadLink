@@ -230,6 +230,15 @@
       },
       "json": "{\"type\":\"slot_changed\",\"slot\":4,\"colour\":\"#00c853\",\"padType\":\"ds4\"}",
       "frameHex": "430000007b2274797065223a22736c6f745f6368616e676564222c22736c6f74223a342c22636f6c6f7572223a2223303063383533222c2270616454797065223a22647334227d"
+    },
+    {
+      "name": "an escaped surrogate pair",
+      "message": {
+        "type": "error",
+        "code": "🎮"
+      },
+      "json": "{\"type\":\"error\",\"code\":\"\\ud83c\\udfae\"}",
+      "frameHex": "260000007b2274797065223a226572726f72222c22636f6465223a225c75643833635c7564666165227d"
     }
   ],
   "ignored": [
@@ -278,6 +287,26 @@
     {
       "name": "invalid UTF-8 in an unknown field",
       "frameHex": "220000007b2274797065223a2262617474657279222c22706374223a352c2278223a22ff227d",
+      "reason": "utf8"
+    },
+    {
+      "name": "a lone high surrogate escape",
+      "frameHex": "200000007b2274797065223a226572726f72222c22636f6465223a225c7564383030227d",
+      "reason": "utf8"
+    },
+    {
+      "name": "a surrogate pair the wrong way round",
+      "frameHex": "260000007b2274797065223a226572726f72222c22636f6465223a225c75646330305c7564383030227d",
+      "reason": "utf8"
+    },
+    {
+      "name": "a lone surrogate in an unknown field",
+      "frameHex": "270000007b2274797065223a2262617474657279222c22706374223a352c2278223a225c7564666666227d",
+      "reason": "utf8"
+    },
+    {
+      "name": "a lone surrogate in a field name",
+      "frameHex": "250000007b2274797065223a2262617474657279222c22706374223a352c225c7564383030223a317d",
       "reason": "utf8"
     },
     {

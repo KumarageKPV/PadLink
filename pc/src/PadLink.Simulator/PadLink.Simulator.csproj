@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Fake phones for load and soak tests. Empty until PLAN.md 2.8, which makes it an Exe: an empty Exe
+       doesn't build. -->
+  <ItemGroup>
+    <ProjectReference Include="..\PadLink.Protocol\PadLink.Protocol.csproj" />
+  </ItemGroup>
+</Project>

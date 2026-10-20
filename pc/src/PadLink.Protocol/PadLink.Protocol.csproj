@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Packets, control-message framing and (from PLAN.md 2.4) crypto: protocol/SPEC.md in C#. -->
+</Project>

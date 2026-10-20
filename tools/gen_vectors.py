@@ -285,6 +285,26 @@ def _reject_constant(name):
     raise ValueError(f"{name} is not JSON")
 
 
+def _has_lone_surrogate(value):
+    """True if a string anywhere in value, field names included, holds a lone surrogate.
+
+    json.loads joins an escaped pair into one character but keeps a lone \\ud800 escape as is. Walks
+    with a stack, not recursion: a 4096-byte frame can nest about 2000 levels deep.
+    """
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            if any(0xD800 <= ord(char) <= 0xDFFF for char in item):
+                return True
+        elif isinstance(item, dict):
+            pending.extend(item.keys())
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+    return False
+
+
 def decode_frame(data):
     """Decode the control frame at the start of data.
 
@@ -309,6 +329,8 @@ def decode_frame(data):
         value = json.loads(text, parse_constant=_reject_constant)
     except ValueError:
         raise DecodeError("json") from None
+    if _has_lone_surrogate(value):
+        raise DecodeError("utf8")
     if not isinstance(value, dict):
         raise DecodeError("not_object")
     kind = value.get("type")
@@ -521,6 +543,12 @@ def _control_vectors(values):
             '{"type":"slot_changed","slot":4,"colour":"#00c853","padType":"ds4"}',
             {"type": "slot_changed", "slot": 4, "colour": "#00c853", "padType": "ds4"},
         ),
+        # How C#'s encoder writes an emoji.
+        (
+            "an escaped surrogate pair",
+            '{"type":"error","code":"\\ud83c\\udfae"}',
+            {"type": "error", "code": "\U0001f3ae"},
+        ),
     ]:
         valid.append({"name": name, "message": message, "json": text, "frameHex": _raw_frame(text.encode()).hex()})
 
@@ -547,6 +575,11 @@ def _control_vectors(values):
         ("invalid UTF-8", _raw_frame(b'{"type":"error","code":"\xff"}'), "utf8"),
         # The whole body must be UTF-8, even a field the receiver skips.
         ("invalid UTF-8 in an unknown field", _raw_frame(b'{"type":"battery","pct":5,"x":"\xff"}'), "utf8"),
+        # An escaped surrogate must be a high one followed by a low one, anywhere in the body.
+        ("a lone high surrogate escape", _raw_frame(b'{"type":"error","code":"\\ud800"}'), "utf8"),
+        ("a surrogate pair the wrong way round", _raw_frame(b'{"type":"error","code":"\\udc00\\ud800"}'), "utf8"),
+        ("a lone surrogate in an unknown field", _raw_frame(b'{"type":"battery","pct":5,"x":"\\udfff"}'), "utf8"),
+        ("a lone surrogate in a field name", _raw_frame(b'{"type":"battery","pct":5,"\\ud800":1}'), "utf8"),
         ("truncated JSON", _raw_frame(b'{"type":"ping"'), "json"),
         ("NaN, which JSON doesn't have", _raw_frame(b'{"type":"battery","pct":NaN}'), "json"),
         ("an array", _raw_frame(b'["ping"]'), "not_object"),
