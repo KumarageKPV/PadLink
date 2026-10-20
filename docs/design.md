@@ -327,7 +327,7 @@ The phone always sends the same 30-byte packet; only the PC's mapping differs by
 
 **Rules**
 
-- In Mixed mode, create the Xbox pads first and in slot order, then read each pad's XInput user index back from the driver ([ViGEmBus release notes](https://github.com/nefarius/ViGEmBus/releases)). If the index does not match the player number, the PC app shows a warning.
+- In Mixed mode, create the Xbox pads first and in slot order, then read each pad's XInput user index back from the driver ([ViGEmBus release notes](https://github.com/nefarius/ViGEmBus/releases)). The index is the LED number in the driver's notification for that pad, which is what Nefarius.ViGEm.Client's `UserIndex` returns. The first notification arrives within about 20 ms of creating the pad, so wait for it before comparing. The driver's own user-index call reads 0 for every pad (docs/decisions.md). If the index does not match the player number, the PC app shows a warning.
 - If another Xbox controller is already connected to the PC in Mixed mode, PadLink's Xbox pads shift down one XInput index, and the warning names the extra device.
 - Submit a report only when a pad's state changes; one writer thread per pad.
 - On Grace or a mode switch, submit a neutral report once, so no button sticks down.

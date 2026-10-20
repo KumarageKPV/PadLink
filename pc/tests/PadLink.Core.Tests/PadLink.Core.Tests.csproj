@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- xunit.v3 test projects are executables. dotnet test runs them through VSTest, so the
+       Category trait filters in CLAUDE.md work. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The shared vector loader, so both test projects read protocol/vectors/ the same way. -->
+    <Compile Include="..\PadLink.Protocol.Tests\Vectors.cs" Link="Vectors.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PadLink.Core\PadLink.Core.csproj" />
+  </ItemGroup>
+</Project>

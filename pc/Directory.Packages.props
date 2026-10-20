@@ -7,6 +7,8 @@
     <!-- X25519 only: .NET 10 has none (docs/decisions.md). HMAC and HKDF are built in. -->
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <!-- Virtual pads through ViGEmBus 1.22.0 (docs/design.md, Tech stack). It embeds the native client. -->
+    <PackageVersion Include="Nefarius.ViGEm.Client" Version="1.21.256" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>

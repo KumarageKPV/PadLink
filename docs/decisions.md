@@ -15,6 +15,13 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — An Xbox pad's user index comes from the driver's LED notification
+- **Iteration:** 2.5
+- **Context:** The design says to read each Xbox pad's XInput user index back from the driver. In the 1.2 spike, the driver's user-index call (`vigem_target_x360_get_user_index`) read 0 for all four pads, while the LED numbers in their notifications gave 0–3. Nefarius.ViGEm.Client 1.21.256 never makes that call. Its notification callback stores the LED number, `UserIndex` returns it, and `UserIndex` throws `Xbox360UserIndexNotReportedException` until the first notification arrives. On the driver, `UserIndex` and the `LedNumber` in `FeedbackReceived` both gave 0–3 for four pads, in the order they were created. `XInputGetState` at each number showed that pad's own state. After a removal, the next pad took the lowest free number, and a fifth Xbox pad's notification carried 255.
+- **Decision:** `ViGEmPadBackend.ReadUserIndex` returns the LED number from the pad's latest notification. It returns null before the first notification, for 255, and for DualShock 4 pads. `FakePadBackend` gives the same lowest free index of 0–3, but when it creates the pad rather than about 20 ms later. A test's `RaiseFeedback` with a `LedNumber` changes the index, as a notification does.
+- **Alternatives:** The driver's user-index call. Rejected: it reads 0 for every pad. The library's `UserIndex`. Not used: it gives the same number, but it throws until the first notification and gives 255 for a fifth pad.
+- **Design change:** "Virtual controller layer", Rules: the user index is the LED number in the driver's notification, not the result of the driver's user-index call.
+
 ### 2026-10-20 — X25519 on the PC through BouncyCastle.Cryptography
 - **Iteration:** 2.4
 - **Context:** .NET 10 (SDK 10.0.401) has no X25519 type. Windows CNG reaches the curve through `ECDiffieHellman` with `ECCurve.CreateFromFriendlyName("curve25519")`. On Windows 11 (build 26300) that can generate a key pair and derive a secret from a peer's public key, but importing a private key throws `CryptographicException: The requested operation is not supported`. So it can't use RFC 7748's fixed keys, and nothing could check it against `crypto.json`. The design's PC row named only System.Security.Cryptography. On the phone, Dart's `cryptography` 2.9.0 matches RFC 7748, but it returns an all-zero shared secret for the `rejectedPublicKeys` instead of failing, so `X25519KeyPair.agree` checks for that itself.

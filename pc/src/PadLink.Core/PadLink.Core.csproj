@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Receiver, control server, slots, modes and pad backends. Empty until PLAN.md 2.5. -->
+  <!-- Receiver, control server, slots, modes and pad backends. -->
+  <ItemGroup>
+    <PackageReference Include="Nefarius.ViGEm.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PadLink.Core.Tests" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PadLink.Protocol\PadLink.Protocol.csproj" />
   </ItemGroup>

@@ -5,6 +5,7 @@
       "padlink.core": {
         "type": "Project",
         "dependencies": {
+          "Nefarius.ViGEm.Client": "[1.21.256, )",
           "PadLink.Protocol": "[1.0.0, )"
         }
       },
@@ -19,6 +20,12 @@
         "requested": "[2.7.0, )",
         "resolved": "2.7.0",
         "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
+      },
+      "Nefarius.ViGEm.Client": {
+        "type": "CentralTransitive",
+        "requested": "[1.21.256, )",
+        "resolved": "1.21.256",
+        "contentHash": "VJMO6hkalOZ7YdXTwcR881aTgPZlN7thEs3x6CWE/kEu7SdE5bY7QuDXkR2eqXfPAee4NrxInIAqa45PorpTsA=="
       }
     }
   }
