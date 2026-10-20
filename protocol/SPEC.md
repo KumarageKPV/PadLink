@@ -182,6 +182,8 @@ Bit 15 is reserved. The phone app never sets it, the codec passes it through unc
 
 - A packet must be exactly 30 bytes (input) or 19 bytes (feedback); drop any other length.
 - The PC drops any packet with a wrong magic, version, type or mac, a slot over 15, or from an address that is not the slot's phone. The phone drops feedback the same way, and feedback for a slot that isn't its own.
+- The slot's phone address is the IP address of the phone's control connection. The PC takes the phone's input from that IP on any source port, so a phone that recreates its UDP socket keeps its slot, and sends feedback to the source port of the newest accepted packet. An IPv4 address in IPv6 form (`::ffff:a.b.c.d`) counts as the IPv4 address. The phone sends input to the PC address its control connection uses.
+- The PC drops input for a slot that has no session without checking its mac, since it has no key for it.
 - The PC drops any input packet whose sequence is not newer than the last one it accepted for that slot in this session. Only packets that pass every other check count as accepted, so a forged packet can't move the mark. Gaps are fine: the newest state wins.
 - "Newer" is serial-number order (RFC 1982), so the u32 wraps from 0xFFFFFFFF to 0: a sequence is newer when (sequence − last) mod 2^32 is 1 to 2^31−1. The first packet of a session has nothing to compare against and is accepted with any sequence. The phone may start each session anywhere.
 - The phone sends at once on any button change, merges stick moves into a 120 Hz frame-synced loop, and repeats the current state at 20 Hz when idle.

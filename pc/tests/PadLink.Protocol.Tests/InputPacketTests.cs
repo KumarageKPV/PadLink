@@ -11,6 +11,17 @@ public class InputPacketTests
     public static TheoryData<string> Valid => Vectors.Names(File, "valid");
     public static TheoryData<string> Invalid => Vectors.Names(File, "invalid");
 
+    public static TheoryData<uint?, uint, bool> SequenceOrder
+    {
+        get
+        {
+            var cases = new TheoryData<uint?, uint, bool>();
+            foreach (var order in Vectors.File(File)["sequenceOrder"]!.AsArray())
+                cases.Add(order!["last"]?.GetValue<uint>(), order["sequence"]!.GetValue<uint>(), order["newer"]!.GetValue<bool>());
+            return cases;
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Valid))]
     public void Valid_vector_decodes_to_its_fields_and_writes_back_the_same_bytes(string name)
@@ -90,6 +101,13 @@ public class InputPacketTests
 
         for (var bit = 4 * 8; bit < InputPacket.MacOffset * 8; bit++)
             AssertDroppedForMac(Vectors.Flipped(bytes, bit), bit);
+    }
+
+    [Theory]
+    [MemberData(nameof(SequenceOrder))]
+    public void A_sequence_is_newer_in_serial_number_order(uint? last, uint sequence, bool newer)
+    {
+        Assert.Equal(newer, InputPacket.IsNewer(sequence, last));
     }
 
     [Fact]

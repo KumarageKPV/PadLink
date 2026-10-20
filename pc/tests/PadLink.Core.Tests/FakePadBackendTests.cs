@@ -83,4 +83,52 @@ public class FakePadBackendTests() : PadBackendContract(new FakePadBackend())
         Fake.RaiseFeedback(xbox, new PadFeedback { LargeMotor = 9 });
         Assert.Null(Fake.ReadUserIndex(xbox));
     }
+
+    [Fact]
+    public void A_pad_shows_its_last_state_and_counts_its_submits()
+    {
+        var state = new PadState { Buttons = PadButtons.Start, Ry = -9 };
+        var pad = Fake.Create(PadType.X360);
+        Assert.Equal((default(PadState), 0), (Fake.StateOf(pad), Fake.SubmitCount(pad)));
+
+        Fake.Submit(pad, default);
+        Fake.Submit(pad, state);
+
+        Assert.Equal((state, 2), (Fake.StateOf(pad), Fake.SubmitCount(pad)));
+    }
+
+    [Fact]
+    public void Without_recording_submits_only_the_last_state_and_count_are_kept()
+    {
+        using var fake = new FakePadBackend { RecordSubmits = false };
+        var state = new PadState { Buttons = PadButtons.FaceTop, Lt = 4 };
+        var pad = fake.Create(PadType.Ds4);
+
+        fake.Submit(pad, default);
+        fake.Submit(pad, state);
+        fake.Remove(pad);
+
+        Assert.Equal<PadCall>([new PadCall.Created(pad, PadType.Ds4), new PadCall.Removed(pad)], fake.Calls);
+        Assert.Throws<ArgumentException>(() => fake.StateOf(pad));
+        Assert.Throws<ArgumentException>(() => fake.SubmitCount(pad));
+    }
+
+    // The receiver's allocation test submits to this mode (PLAN.md 2.6), and a long host run keeps it.
+    [Fact]
+    public void Submit_without_recording_allocates_nothing()
+    {
+        using var fake = new FakePadBackend { RecordSubmits = false };
+        fake.Create(PadType.X360);
+        var pad = fake.Create(PadType.Ds4);
+        var state = new PadState { Lx = 1 };
+        fake.Submit(pad, state); // warm-up
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 10_000; i++)
+            fake.Submit(pad, state);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+        Assert.Equal(10_001, fake.SubmitCount(pad));
+    }
 }

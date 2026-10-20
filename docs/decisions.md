@@ -15,6 +15,13 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — A slot's phone address is the IP of its control connection, on any port
+- **Iteration:** 2.6
+- **Context:** docs/design.md and protocol/SPEC.md drop input "from an address that is not the slot's phone" without saying what that address is (open from 2.1's review). A phone's UDP source port changes when its app recreates the socket, while its IP stays the same. The mac and the sequence check are what stop forged and replayed packets. The address check is an extra filter, done before the mac so a flood from other hosts costs no HMAC.
+- **Decision:** The slot's address is the IP of the phone's control connection, known by `welcome`, before any UDP arrives. The PC takes input from that IP on any source port and sends feedback to the source port of the newest accepted packet. An IPv4 address in IPv6 form, as a dual-stack TCP socket reports it, counts as the IPv4 address. SPEC.md, "Packet rules", says so, and that the PC drops input for a slot with no session before checking its mac. `InputReceiver` (`pc/src/PadLink.Core/Input/InputReceiver.cs`) compares the IP bytes in the received socket address, which allocates nothing. Given an IPv6 endpoint it binds dual-mode, and an IPv4 phone's address is then compared in IPv6 form. No bytes on the wire change, so the version stays 1.
+- **Alternatives:** The IP and port of the first accepted packet. Rejected: a phone that recreates its socket would lose its slot until it rejoined, and the first copy of the phone's first packet to arrive would set the port, so someone who forges the phone's IP and wins that race would hold the slot's feedback.
+- **Design change:** none (the design doesn't define the address; SPEC.md now does)
+
 ### 2026-10-20 — An Xbox pad's user index comes from the driver's LED notification
 - **Iteration:** 2.5
 - **Context:** The design says to read each Xbox pad's XInput user index back from the driver. In the 1.2 spike, the driver's user-index call (`vigem_target_x360_get_user_index`) read 0 for all four pads, while the LED numbers in their notifications gave 0–3. Nefarius.ViGEm.Client 1.21.256 never makes that call. Its notification callback stores the LED number, `UserIndex` returns it, and `UserIndex` throws `Xbox360UserIndexNotReportedException` until the first notification arrives. On the driver, `UserIndex` and the `LedNumber` in `FeedbackReceived` both gave 0–3 for four pads, in the order they were created. `XInputGetState` at each number showed that pad's own state. After a removal, the next pad took the lowest free number, and a fifth Xbox pad's notification carried 255.

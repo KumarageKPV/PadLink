@@ -33,7 +33,8 @@ public readonly record struct InputPacket
 
     /// <summary>
     /// Reads a packet and checks its length, magic, version, type, slot and mac. Throws
-    /// <see cref="ArgumentException"/> for a session key that isn't 32 bytes.
+    /// <see cref="ArgumentException"/> for a session key that isn't 32 bytes, before any other check.
+    /// The exception allocates, so a receiver drops a packet whose slot has no session before calling this.
     /// </summary>
     public static bool TryRead(ReadOnlySpan<byte> source, ReadOnlySpan<byte> sessionKey, out InputPacket packet, out PacketError error)
     {
@@ -58,6 +59,14 @@ public readonly record struct InputPacket
         };
         return true;
     }
+
+    /// <summary>
+    /// Whether sequence is newer than last, the sequence of the last packet accepted in the session, in
+    /// serial-number order: (sequence − last) mod 2^32 is 1 to 2^31 − 1. Every sequence is newer than
+    /// null, which stands for no packet yet (protocol/SPEC.md, "Packet rules").
+    /// </summary>
+    public static bool IsNewer(uint sequence, uint? last) =>
+        last is not { } mark || unchecked(sequence - mark - 1) < int.MaxValue;
 
     /// <summary>Writes the packet, with its mac, to the first <see cref="Size"/> bytes of destination.</summary>
     public void Write(Span<byte> destination, ReadOnlySpan<byte> sessionKey)
