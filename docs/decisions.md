@@ -15,6 +15,27 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — A byte-order mark before a control message is bad_message
+- **Iteration:** 2.3
+- **Context:** RFC 8259 forbids senders to put a byte-order mark before networked JSON, but lets parsers ignore one, and SPEC.md didn't say which. Python's `json.loads` and System.Text.Json reject it as not JSON. Dart's `utf8.decode` drops a leading one without telling, so Dart accepted the frame.
+- **Decision:** It stays `bad_message` with reason `json`: the body is not a JSON text. SPEC.md says so, and warns that Dart needs its own check of the first 3 bytes. `control.json` gains an invalid vector. Python and C# already passed it. Not a wire change, so the version stays 1.
+- **Alternatives:** Ignore it, as RFC 8259 allows. Rejected: Python and C# would need code to skip it, so that no valid sender's frame changes, and a receiver that misses the rule would disagree on the same bytes.
+- **Design change:** none (protocol/SPEC.md holds byte-level rules)
+
+### 2026-10-20 — Base64 in control messages must have zero unused bits
+- **Iteration:** 2.3
+- **Context:** Before the padding, base64 text can carry bits that no byte uses. A 16-byte nonce ending `…urx==` decodes to the same bytes as `…urw==`. C#'s `Convert.FromBase64String` and Python's `b64decode` accept it, but Dart 3.13.5's `base64.decode` throws `FormatException`. Dart's decoder also accepts base64url and `%3D` for `=`, which the others reject.
+- **Decision:** SPEC.md requires the unused bits to be zero (RFC 4648 section 3.5 lets decoders reject them), so each byte string has one text. All three decoders check that the decoded bytes encode back to the same text, which also catches Dart's base64url and `%3D`. `control.json` gains invalid vectors for a nonce (`==`) and a key (`=`) with an unused bit set, and one for `%3D`. Not a wire change, since valid senders write the same bytes, so the version stays 1.
+- **Alternatives:** Accept any unused bits, and make Dart decode leniently. Rejected: Dart would need its own decoder, and two texts for the same bytes leave room for disagreement over what was sent.
+- **Design change:** none (protocol/SPEC.md holds byte-level rules)
+
+### 2026-10-20 — No JSON object in a control message may repeat a name
+- **Iteration:** 2.3
+- **Context:** SPEC.md didn't say what `{"type":"battery","pct":"x","pct":5}` means. Python's `json.loads` and Dart's `jsonDecode` keep the last copy and accept it. C# read each copy in turn, so the bad first one made it `bad_message`. Dart can't see a repeat through `jsonDecode`: its `reviver` callback gets every copy, but not which object each one belongs to.
+- **Decision:** A repeated name in any object, at any depth, is `bad_message` with the new reason `name_repeated`. That matches I-JSON (RFC 7493 section 2.3) and the rule that lone surrogates are faults anywhere in the body. Names are compared after unescaping. Python rejects repeats in `json.loads`'s `object_pairs_hook`. C#'s `ControlFrame.Scan` keeps a set of names for each open object (`ControlFault.NameRepeated`). Dart makes one pass over text that `jsonDecode` has accepted, which also finds lone surrogate escapes and nesting over 32 levels. 2.2's C# test that a repeated `type` takes the last one now expects a rejection. `control.json` gains 3 invalid vectors and a valid one where names repeat only across objects. Not a wire change, so the version stays 1.
+- **Alternatives:** Only top-level names. Rejected: no simpler in C# or Dart, and it would split the body into parts with different rules. Keep the last copy, as most readers do. Rejected: C# binds each copy as it reads it, so it would need a second parse to agree. Reason `json` instead of a new one. Not chosen: a separate reason shows exactly which rule a vector tests.
+- **Design change:** none (protocol/SPEC.md holds byte-level rules)
+
 ### 2026-10-20 — A lone surrogate escape in a control message is bad_message
 - **Iteration:** 2.2
 - **Context:** JSON lets a string escape a UTF-16 surrogate on its own (`"\ud800"`). Such a string has no UTF-8 form, and readers disagree: Python's `json.loads` and Dart's `jsonDecode` accept it, while System.Text.Json's `GetString` throws. 2.1's review left this without a rule or a vector.

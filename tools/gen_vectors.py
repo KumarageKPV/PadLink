@@ -241,9 +241,12 @@ def _base64_bytes(size):
         if not isinstance(value, str):
             return False
         try:
-            return len(base64.b64decode(value, validate=True)) == size
+            decoded = base64.b64decode(value, validate=True)
         except ValueError:  # binascii.Error, or non-ASCII text
             return False
+        # b64decode ignores the unused bits before the padding, so each byte string must re-encode to
+        # its own text.
+        return len(decoded) == size and base64.b64encode(decoded).decode("ascii") == value
 
     return check
 
@@ -283,6 +286,14 @@ MESSAGES = {
 
 def _reject_constant(name):
     raise ValueError(f"{name} is not JSON")
+
+
+def _unique_names(pairs):
+    """json.loads's object_pairs_hook: an object may not repeat a name (I-JSON, RFC 7493)."""
+    obj = dict(pairs)
+    if len(obj) != len(pairs):
+        raise DecodeError("name_repeated")
+    return obj
 
 
 def _has_lone_surrogate(value):
@@ -326,8 +337,10 @@ def decode_frame(data):
     except UnicodeDecodeError:
         raise DecodeError("utf8") from None
     try:
-        value = json.loads(text, parse_constant=_reject_constant)
-    except ValueError:
+        value = json.loads(text, parse_constant=_reject_constant, object_pairs_hook=_unique_names)
+    except DecodeError:
+        raise
+    except ValueError:  # a byte-order mark too: JSON has none
         raise DecodeError("json") from None
     if _has_lone_surrogate(value):
         raise DecodeError("utf8")
@@ -372,6 +385,14 @@ def _raw_frame(payload):
 
 def _b64(data):
     return base64.b64encode(data).decode("ascii")
+
+
+def _spare_bits_set(text):
+    """Base64 for the same bytes, with an unused bit before the padding set. Strict decoders refuse it."""
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    last = len(text.rstrip("=")) - 1
+    assert last < len(text) - 1, "only base64 with padding has unused bits"
+    return text[:last] + alphabet[alphabet.index(text[last]) | 1] + text[last + 1 :]
 
 
 def _crypto_values():
@@ -549,6 +570,12 @@ def _control_vectors(values):
             '{"type":"error","code":"\\ud83c\\udfae"}',
             {"type": "error", "code": "\U0001f3ae"},
         ),
+        # Each object's names are its own.
+        (
+            "names repeated only across objects",
+            '{"type":"ping","x":{"type":"pong"},"y":[{"a":1},{"a":2}]}',
+            {"type": "ping"},
+        ),
     ]:
         valid.append({"name": name, "message": message, "json": text, "frameHex": _raw_frame(text.encode()).hex()})
 
@@ -580,6 +607,13 @@ def _control_vectors(values):
         ("a surrogate pair the wrong way round", _raw_frame(b'{"type":"error","code":"\\udc00\\ud800"}'), "utf8"),
         ("a lone surrogate in an unknown field", _raw_frame(b'{"type":"battery","pct":5,"x":"\\udfff"}'), "utf8"),
         ("a lone surrogate in a field name", _raw_frame(b'{"type":"battery","pct":5,"\\ud800":1}'), "utf8"),
+        # JSON has no byte-order mark, and senders must not add one (RFC 8259 section 8.1).
+        ("a byte-order mark before the object", _raw_frame(b'\xef\xbb\xbf{"type":"ping"}'), "json"),
+        # No object may repeat a name, anywhere in the body (I-JSON, RFC 7493 section 2.3).
+        ("a repeated field, the first copy invalid", _raw_frame(b'{"type":"battery","pct":"x","pct":5}'),
+         "name_repeated"),
+        ("type repeated through an escape", _raw_frame(b'{"type":"ping","\\u0074ype":"ping"}'), "name_repeated"),
+        ("a repeated name in an unknown field", _raw_frame(b'{"type":"ping","x":{"a":1,"a":1}}'), "name_repeated"),
         ("truncated JSON", _raw_frame(b'{"type":"ping"'), "json"),
         ("NaN, which JSON doesn't have", _raw_frame(b'{"type":"battery","pct":NaN}'), "json"),
         ("an array", _raw_frame(b'["ping"]'), "not_object"),
@@ -598,6 +632,12 @@ def _control_vectors(values):
         ("hello nonce with a space", json_frame({**hello, "nonce": nonce[:8] + " " + nonce[8:]}), "field_invalid"),
         ("hello nonce in base64url", json_frame({**hello, "nonce": url_nonce}), "field_invalid"),
         ("hello nonce without padding", json_frame({**hello, "nonce": nonce.rstrip("=")}), "field_invalid"),
+        ("hello nonce with %3D for padding", json_frame({**hello, "nonce": nonce.replace("=", "%3D")}),
+         "field_invalid"),
+        # The unused bits before the padding must be zero, so each byte string has one text.
+        ("hello nonce with unused bits set", json_frame({**hello, "nonce": _spare_bits_set(nonce)}), "field_invalid"),
+        ("pair key with unused bits set", json_frame({"type": "pair", "key": _spare_bits_set(_b64(values["phonePublic"])),
+                                                      "proof": _b64(values["proof"])}), "field_invalid"),
         ("hello nonce with non-ASCII letters", json_frame({**hello, "nonce": "é" * 24}), "field_invalid"),
         ("challenge nonce not base64", json_frame({"type": "challenge", "nonce": "not base64!"}), "field_invalid"),
         ("pair with a 31-byte key", json_frame({"type": "pair", "key": _b64(values["phonePublic"][:31]),

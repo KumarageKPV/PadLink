@@ -30,7 +30,8 @@ internal sealed partial class ControlJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Standard base64 with padding and nothing else (protocol/SPEC.md, "Conventions"). .NET's own
-/// decoder also accepts spaces and line breaks, so the text is checked first.
+/// decoder also accepts spaces and line breaks, and ignores the unused bits before the padding, so
+/// the text is checked first and the bytes must encode back to it.
 /// </summary>
 internal sealed class Base64Converter : JsonConverter<byte[]>
 {
@@ -44,7 +45,10 @@ internal sealed class Base64Converter : JsonConverter<byte[]>
         var text = reader.GetString()!;
         if (!IsStrict(text))
             throw new JsonException("Expected standard base64 with padding.");
-        return Convert.FromBase64String(text);
+        var bytes = Convert.FromBase64String(text);
+        if (Convert.ToBase64String(bytes) != text)
+            throw new JsonException("Expected the unused bits before the padding to be zero.");
+        return bytes;
     }
 
     public override void Write(Utf8JsonWriter writer, byte[] value, JsonSerializerOptions options) =>

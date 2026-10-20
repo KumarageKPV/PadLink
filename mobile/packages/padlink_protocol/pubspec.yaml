@@ -1,0 +1,12 @@
+name: padlink_protocol
+description: >-
+  PadLink's wire protocol for the phone app: UDP input and feedback packets,
+  TCP control frames and the pad mapping (protocol/SPEC.md).
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0

@@ -9,7 +9,7 @@ This is the contract between the phone app and the PC companion. It is the "Netw
 ## Conventions
 
 - Multi-byte integers are little-endian. u16 and u32 are unsigned; int16 is signed two's complement.
-- Byte strings inside JSON messages are standard base64 with padding (RFC 4648 section 4: `A–Z a–z 0–9 + /` and `=`).
+- Byte strings inside JSON messages are standard base64 with padding (RFC 4648 section 4: `A–Z a–z 0–9 + /` and `=`). The unused bits before the padding are zero (section 3.5), so each byte string has exactly one text.
 - `slot` is 0–15 everywhere on the wire. The apps show it as player 1–16.
 - ‖ means concatenation. The vectors write bytes as lowercase hex.
 
@@ -103,8 +103,10 @@ On a mode switch the PC sends `mode_changed` to every phone first, then `slot_ch
 - A sender never sends a frame over 4096 bytes.
 - Receivers accept any spacing, field order and string escaping. They ignore fields they don't know, and whole messages whose `type` they don't know, so a newer peer can add both. Messages never nest objects or arrays, so a receiver may reject JSON nested more than 32 levels deep as `bad_message`.
 - The whole body must be UTF-8, including fields the receiver skips. A frame whose body is not UTF-8, is not a JSON object, or has no string `type`, and a known message with a missing or invalid field, all get `error` with code `bad_message`, and then the connection closes.
+- The body starts with the JSON itself. A UTF-8 byte-order mark before it is not JSON, and senders must not add one (RFC 8259 section 8.1). Dart's `utf8.decode` drops a leading one without telling, so check the first bytes.
+- No JSON object in the body may repeat a name, at any depth, as I-JSON requires (RFC 7493 section 2.3). Names are compared after unescaping, so `type` and `\u0074ype` are the same name. Python's `json.loads` and Dart's `jsonDecode` keep the last copy without telling, so check for repeats yourself.
 - A string escape for a UTF-16 surrogate must be a high one (`\ud800`–`\udbff`) followed at once by an escaped low one (`\udc00`–`\udfff`), which together stand for one character. A lone or reversed surrogate escape has no UTF-8 form, so it breaks the rule above, anywhere in the body: in names, in values, and in fields the receiver skips. Python's `json.loads` and Dart's `jsonDecode` accept them, so check the decoded strings. System.Text.Json's reader reads and skips them without complaint, and only `GetString` throws, so unescape every escaped name and string, skipped ones included.
-- Base64 fields use only the standard alphabet, with padding and no spaces or line breaks. Some decoders are lenient (.NET's accepts spaces, Dart's accepts base64url), so check the text first.
+- Base64 fields use only the standard alphabet, with padding and no spaces or line breaks, and the unused bits before the padding are zero. Most decoders are lenient: .NET's accepts spaces, Python's and .NET's ignore the unused bits, and Dart's accepts base64url and `%3D` for `=`. So check that the decoded bytes encode back to the same text.
 
 **Error codes.** Receivers treat a code they don't know as a general error.
 
@@ -225,6 +227,6 @@ The phone always sends the same 30-byte packet; only the PC's mapping differs by
 An implementation passes when:
 
 - **Packets.** It decodes every valid vector to its fields, encodes those fields back to the same bytes, and drops every invalid vector for the stated reason: `length`, `magic`, `version`, `type`, `slot` or `mac`.
-- **Control frames.** It decodes every valid frame to its message, without fields its type doesn't define. Its own frame for that message decodes to the same message; the bytes needn't match. It ignores every ignored frame and rejects every invalid one. The reasons `incomplete`, `frame_empty` and `frame_too_long` must match. The others (`utf8`, `json`, `not_object`, `type`, `field_missing`, `field_invalid`) all mean `bad_message`, so it may report any of them.
+- **Control frames.** It decodes every valid frame to its message, without fields its type doesn't define. Its own frame for that message decodes to the same message; the bytes needn't match. It ignores every ignored frame and rejects every invalid one. The reasons `incomplete`, `frame_empty` and `frame_too_long` must match. The others (`utf8`, `json`, `name_repeated`, `not_object`, `type`, `field_missing`, `field_invalid`) all mean `bad_message`, so it may report any of them.
 - **Mapping and crypto.** It computes every value in `mapping.json` and `crypto.json`, and refuses every key in `rejectedPublicKeys`.
 - **Sequence order.** The PC's receiver gives every `sequenceOrder` case its `newer` result.

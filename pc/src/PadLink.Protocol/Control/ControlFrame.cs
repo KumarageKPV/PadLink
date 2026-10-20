@@ -33,6 +33,9 @@ public enum ControlFault
     /// <summary>Not JSON, or nested more than 32 levels deep.</summary>
     Json,
 
+    /// <summary>An object, at any depth, repeats a name.</summary>
+    NameRepeated,
+
     NotObject,
 
     /// <summary>No string <c>type</c> field.</summary>
@@ -137,14 +140,18 @@ public static class ControlFrame
     }
 
     // One pass over the whole body before any field is bound, since the rules cover fields no message
-    // has: the body must be UTF-8 and JSON, with no escape for a lone surrogate. Also finds the
-    // top-level type; like most JSON readers, the last one wins.
+    // has: the body must be UTF-8 and JSON, with no escape for a lone surrogate, and no object may
+    // repeat a name. Also finds the top-level type.
     private static ControlFault Scan(ReadOnlySpan<byte> body, out string? type)
     {
         type = null;
         if (!Utf8.IsValid(body))
             return ControlFault.Utf8;
         var reader = new Utf8JsonReader(body, new JsonReaderOptions { MaxDepth = MaxDepth });
+        // The names of each open object, innermost on top. A name always belongs to the innermost
+        // open object, since any array inside it has closed by then.
+        var names = new Stack<HashSet<string>>();
+        var typeIsNext = false;
         bool isObject;
         try
         {
@@ -152,13 +159,28 @@ public static class ControlFrame
             isObject = reader.TokenType == JsonTokenType.StartObject;
             do
             {
-                if (reader.TokenType is JsonTokenType.String or JsonTokenType.PropertyName && reader.ValueIsEscaped)
-                    _ = reader.GetString(); // throws InvalidOperationException for a lone surrogate
-                if (isObject && reader.CurrentDepth == 1 && reader.TokenType == JsonTokenType.PropertyName
-                    && reader.ValueTextEquals("type"u8))
+                if (typeIsNext)
                 {
-                    reader.Read();
                     type = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
+                    typeIsNext = false;
+                }
+                switch (reader.TokenType)
+                {
+                    case JsonTokenType.StartObject:
+                        names.Push([]);
+                        break;
+                    case JsonTokenType.EndObject:
+                        names.Pop();
+                        break;
+                    case JsonTokenType.PropertyName:
+                        var name = reader.GetString()!; // throws InvalidOperationException for a lone surrogate
+                        if (!names.Peek().Add(name))
+                            return ControlFault.NameRepeated;
+                        typeIsNext = names.Count == 1 && name == "type";
+                        break;
+                    case JsonTokenType.String when reader.ValueIsEscaped:
+                        _ = reader.GetString(); // as above
+                        break;
                 }
             } while (reader.Read());
         }

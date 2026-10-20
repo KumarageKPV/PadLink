@@ -94,6 +94,7 @@ public class ControlFrameTests
     {
         "utf8" => ControlFault.Utf8,
         "json" => ControlFault.Json,
+        "name_repeated" => ControlFault.NameRepeated,
         "not_object" => ControlFault.NotObject,
         "type" => ControlFault.Type,
         "field_missing" or "field_invalid" => ControlFault.Field,
@@ -263,7 +264,12 @@ public class ControlFrameTests
     [InlineData("""{"type":"ping","x":"\ud800\ud800"}""")]
     [InlineData("""{"type":"ping","x":"\ud800","type":"ping"}""")]
     [InlineData("""{"type":"error","code":null}""")]
-    [InlineData("""{"type":"ping","type":5}""")] // the last type wins, as in most JSON readers
+    [InlineData("""{"type":"ping","type":5}""")] // no object repeats a name
+    [InlineData("""{"type":"bye","type":"ping"}""")]
+    [InlineData("""{"type":"ping","x":[{"a":1,"a":2}]}""")]
+    [InlineData("""{"type":"ping","x":{"\u0061":1,"a":2}}""")] // compared after unescaping
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urx=="}""")] // an unused bit set
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw%3D%3D"}""")]
     [InlineData("""   """)]
     public void Frames_the_vectors_do_not_cover_are_bad_messages(string json)
     {
@@ -272,11 +278,20 @@ public class ControlFrameTests
         Assert.NotEqual(ControlFault.None, fault);
     }
 
+    // The type's value is read as the next token, so an object there must still get its own names.
+    [Fact]
+    public void An_object_as_the_type_value_is_a_type_fault()
+    {
+        Assert.False(ControlFrame.TryDecode("""{"x":{"a":1},"type":{"a":1}}"""u8, out _, out var fault));
+
+        Assert.Equal(ControlFault.Type, fault);
+    }
+
     [Theory]
     [InlineData("""{"type":"pong","x":"\ud83c\udfae","\u00e9":[1,{"a":null}]}""", "pong")]
     [InlineData("""{"\u0074ype":"\u0070ing"}""", "ping")] // escapes in names and the type
-    [InlineData("""{"type":"bye","type":"ping"}""", "ping")]
     [InlineData("""{"x":{"type":"bye"},"type":"ping"}""", "ping")] // only the top-level type counts
+    [InlineData("""{"x":{"a":1},"type":"ping","y":[{"a":1},{"a":1}]}""", "ping")] // each object has its own names
     public void Frames_other_senders_may_write_decode(string json, string type)
     {
         Assert.True(ControlFrame.TryDecode(Encoding.UTF8.GetBytes(json), out var message, out var fault), $"{fault}");

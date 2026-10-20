@@ -20,7 +20,7 @@ One box per PLAN.md iteration. `/next` works on the first unticked box; `/finish
 
 - [x] 2.1 Protocol spec and shared test vectors — 2026-10-20 — protocol/SPEC.md fills the design's gaps (nonces in hello and pair_required, HKDF labels, strict base64 JSON, DS4 stick and hat mapping, serial-number sequence order, single-use pairing code); tools/gen_vectors.py writes 5 vector files (31 valid, 57 invalid, 1 ignored); check_vectors.py diffs them, decodes each, and fails on any SPEC table field no vector uses
 - [x] 2.2 C# solution and protocol library — 2026-10-20 — pc/PadLink.sln with the 5 section-3 projects (only Protocol has code) and PadLink.Protocol.Tests; input and feedback packets as readonly record structs with span TryRead/Write that allocate 0 bytes, and ControlFrame framing with strict source-generated JSON messages; 94 vector cases pass, with the mac check left to 2.4; a lone surrogate escape is now bad_message (SPEC.md, 4 vectors); the other test projects come with their first code
-- [ ] 2.3 Dart protocol package
+- [x] 2.3 Dart protocol package — 2026-10-20 — mobile/packages/padlink_protocol has the packets on ByteData, button bits, framing, the 13 messages and the DS4 stick and hat mapping, and passes every vector (208 tests), with the mac check left to 2.4; a name repeated in any JSON object (new reason name_repeated), base64 with unused bits set, and a leading byte-order mark are now bad_message in SPEC.md, the vectors, Python and C#, since Dart's decoders disagreed (3 decisions)
 - [ ] 2.4 Crypto on both sides
 - [ ] 2.5 Pad backend and mappings
 - [ ] 2.6 UDP input receiver

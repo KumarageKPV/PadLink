@@ -6,6 +6,7 @@ with the standard library, so the generator's use of the cryptography package is
 Run: python -m unittest discover -s tools/tests -v
 """
 
+import base64
 import contextlib
 import hashlib
 import hmac
@@ -277,6 +278,42 @@ class FramingTests(unittest.TestCase):
                 self.assertEqual(caught.exception.reason, "utf8")
         with self.assertRaises(ValueError):
             gv.frame({"type": "error", "code": "\ud800"})
+
+    def test_an_object_may_not_repeat_a_name_anywhere_in_the_body(self):
+        frames = [
+            raw_frame(b'{"type":"battery","pct":"x","pct":5}'),  # json.loads alone keeps the last copy
+            raw_frame(b'{"type":"ping","type":"ping"}'),
+            raw_frame(b'{"type":"ping","\\u0074ype":"ping"}'),  # compared after unescaping
+            raw_frame(b'{"type":"ping","x":{"a":1,"a":2}}'),  # in a field the receiver skips
+            raw_frame(b'{"type":"ping","x":[{"a":1,"a":2}]}'),
+        ]
+        for data in frames:
+            with self.subTest(frame=data[4:]):
+                with self.assertRaises(gv.DecodeError) as caught:
+                    gv.decode_frame(data)
+                self.assertEqual(caught.exception.reason, "name_repeated")
+
+    def test_names_may_repeat_across_objects(self):
+        data = raw_frame(b'{"type":"ping","x":{"type":1},"y":[{"a":1},{"a":2}]}')
+        self.assertEqual(gv.decode_frame(data), {"type": "ping"})
+
+    def test_base64_bits_after_the_last_byte_must_be_zero(self):
+        # Each pair decodes to the same bytes; only the first sets no unused bit.
+        for good, bad in [
+            ("oKGio6SlpqeoqaqrrK2urw==", "oKGio6SlpqeoqaqrrK2urx=="),  # 16 bytes: 4 unused bits
+            ("A" * 42 + "A=", "A" * 42 + "B="),  # 32 bytes: 2 unused bits
+        ]:
+            self.assertEqual(base64.b64decode(good), base64.b64decode(bad))
+            size = len(base64.b64decode(good))
+            with self.subTest(text=bad):
+                self.assertTrue(gv._base64_bytes(size)(good))
+                self.assertFalse(gv._base64_bytes(size)(bad))
+        self.assertFalse(gv._base64_bytes(16)("oKGio6SlpqeoqaqrrK2urw%3D%3D"))
+
+    def test_a_byte_order_mark_is_not_json(self):
+        with self.assertRaises(gv.DecodeError) as caught:
+            gv.decode_frame(raw_frame(b'\xef\xbb\xbf{"type":"ping"}'))
+        self.assertEqual(caught.exception.reason, "json")
 
     def test_the_surrogate_check_handles_the_deepest_nesting_a_frame_can_hold(self):
         shell = len('{"type":"ping","x":}')
