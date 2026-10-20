@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'crypto.dart';
+
 /// What the input and feedback packets share (protocol/SPEC.md, "Packet
 /// rules").
 abstract final class Packet {
@@ -15,7 +17,7 @@ abstract final class Packet {
 }
 
 /// Why a packet was dropped. The names are the reasons the vectors use.
-enum PacketError { length, magic, version, type, slot }
+enum PacketError { length, magic, version, type, slot, mac }
 
 /// A packet to drop.
 final class PacketException implements Exception {
@@ -59,8 +61,7 @@ final class InputPacket {
   /// The mac covers every byte before this offset.
   static const macOffset = 22;
 
-  /// Throws [RangeError] for a field outside its wire range. Without a [mac],
-  /// [write] writes 8 zero bytes there, for the sender to fill in.
+  /// Throws [RangeError] for a field outside its wire range.
   InputPacket({
     required this.slot,
     required this.sequence,
@@ -72,8 +73,7 @@ final class InputPacket {
     required this.lt,
     required this.rt,
     required this.sentMs,
-    Uint8List? mac,
-  }) : mac = _macOf(mac) {
+  }) {
     _checkSlot(slot);
     RangeError.checkValueInInterval(sequence, 0, 0xFFFFFFFF, 'sequence');
     RangeError.checkValueInInterval(buttons, 0, 0xFFFF, 'buttons');
@@ -86,11 +86,11 @@ final class InputPacket {
     RangeError.checkValueInInterval(sentMs, 0, 0xFFFF, 'sentMs');
   }
 
-  /// Reads a packet and checks its length, magic, version, type and slot.
-  /// Throws [PacketException] for a packet to drop. The mac needs the session
-  /// key, so the caller checks it.
-  factory InputPacket.read(Uint8List source) {
-    _checkHeader(source, size, Packet.inputType);
+  /// Reads a packet and checks its length, magic, version, type, slot and
+  /// mac. Throws [PacketException] for a packet to drop, and [ArgumentError]
+  /// for a session key that isn't 32 bytes.
+  factory InputPacket.read(Uint8List source, Uint8List sessionKey) {
+    _check(source, size, Packet.inputType, sessionKey);
     final data = ByteData.sublistView(source);
     return InputPacket(
       slot: source[3],
@@ -103,7 +103,6 @@ final class InputPacket {
       lt: source[18],
       rt: source[19],
       sentMs: data.getUint16(20, Endian.little),
-      mac: source.sublist(macOffset),
     );
   }
 
@@ -129,11 +128,10 @@ final class InputPacket {
   /// The phone's millisecond clock, which wraps at 16 bits.
   final int sentMs;
 
-  final Uint8List mac;
-
-  /// Writes the packet to the first [size] bytes of destination.
-  void write(Uint8List destination) {
-    _writeHeader(destination, size, Packet.inputType, slot);
+  /// Writes the packet, with its mac, to the first [size] bytes of
+  /// destination.
+  void write(Uint8List destination, Uint8List sessionKey) {
+    _writeHeader(destination, size, Packet.inputType, slot, sessionKey);
     ByteData.sublistView(destination)
       ..setUint32(4, sequence, Endian.little)
       ..setUint16(8, buttons, Endian.little)
@@ -144,7 +142,7 @@ final class InputPacket {
       ..setUint8(18, lt)
       ..setUint8(19, rt)
       ..setUint16(20, sentMs, Endian.little);
-    destination.setRange(macOffset, size, mac);
+    _writeMac(destination, size, sessionKey);
   }
 }
 
@@ -156,8 +154,7 @@ final class FeedbackPacket {
   /// The mac covers every byte before this offset.
   static const macOffset = 11;
 
-  /// Throws [RangeError] for a field outside its wire range. Without a [mac],
-  /// [write] writes 8 zero bytes there, for the sender to fill in.
+  /// Throws [RangeError] for a field outside its wire range.
   FeedbackPacket({
     required this.slot,
     required this.largeMotor,
@@ -166,8 +163,7 @@ final class FeedbackPacket {
     required this.green,
     required this.blue,
     required this.echoMs,
-    Uint8List? mac,
-  }) : mac = _macOf(mac) {
+  }) {
     _checkSlot(slot);
     _checkByte(largeMotor, 'largeMotor');
     _checkByte(smallMotor, 'smallMotor');
@@ -178,8 +174,8 @@ final class FeedbackPacket {
   }
 
   /// Reads a packet like [InputPacket.read].
-  factory FeedbackPacket.read(Uint8List source) {
-    _checkHeader(source, size, Packet.feedbackType);
+  factory FeedbackPacket.read(Uint8List source, Uint8List sessionKey) {
+    _check(source, size, Packet.feedbackType, sessionKey);
     return FeedbackPacket(
       slot: source[3],
       largeMotor: source[4],
@@ -188,7 +184,6 @@ final class FeedbackPacket {
       green: source[7],
       blue: source[8],
       echoMs: ByteData.sublistView(source).getUint16(9, Endian.little),
-      mac: source.sublist(macOffset),
     );
   }
 
@@ -202,11 +197,10 @@ final class FeedbackPacket {
   /// The `sentMs` of the last input packet the PC accepted from this phone.
   final int echoMs;
 
-  final Uint8List mac;
-
-  /// Writes the packet to the first [size] bytes of destination.
-  void write(Uint8List destination) {
-    _writeHeader(destination, size, Packet.feedbackType, slot);
+  /// Writes the packet, with its mac, to the first [size] bytes of
+  /// destination.
+  void write(Uint8List destination, Uint8List sessionKey) {
+    _writeHeader(destination, size, Packet.feedbackType, slot, sessionKey);
     destination
       ..[4] = largeMotor
       ..[5] = smallMotor
@@ -214,13 +208,23 @@ final class FeedbackPacket {
       ..[7] = green
       ..[8] = blue;
     ByteData.sublistView(destination).setUint16(9, echoMs, Endian.little);
-    destination.setRange(macOffset, size, mac);
+    _writeMac(destination, size, sessionKey);
   }
 }
 
-void _checkHeader(Uint8List source, int size, int type) {
+// Checks the length, magic, version, type and slot, then the mac.
+void _check(Uint8List source, int size, int type, Uint8List sessionKey) {
+  PacketMac.checkSessionKey(sessionKey);
   final error = _headerError(source, size, type);
   if (error != null) throw PacketException(error);
+  final macOffset = size - Packet.macSize;
+  if (!PacketMac.matches(
+    sessionKey,
+    Uint8List.sublistView(source, 0, macOffset),
+    Uint8List.sublistView(source, macOffset),
+  )) {
+    throw const PacketException(PacketError.mac);
+  }
 }
 
 PacketError? _headerError(Uint8List source, int size, int type) {
@@ -232,7 +236,13 @@ PacketError? _headerError(Uint8List source, int size, int type) {
   return null;
 }
 
-void _writeHeader(Uint8List destination, int size, int type, int slot) {
+void _writeHeader(
+  Uint8List destination,
+  int size,
+  int type,
+  int slot,
+  Uint8List sessionKey,
+) {
   if (destination.length < size) {
     throw ArgumentError.value(
       destination.length,
@@ -240,6 +250,7 @@ void _writeHeader(Uint8List destination, int size, int type, int slot) {
       'A packet needs $size bytes',
     );
   }
+  PacketMac.checkSessionKey(sessionKey);
   destination
     ..[0] = Packet.magic
     ..[1] = Packet.version
@@ -247,13 +258,16 @@ void _writeHeader(Uint8List destination, int size, int type, int slot) {
     ..[3] = slot;
 }
 
-// A copy, so the caller's list can't change the packet.
-Uint8List _macOf(Uint8List? mac) {
-  if (mac == null) return Uint8List(Packet.macSize);
-  if (mac.length != Packet.macSize) {
-    throw ArgumentError.value(mac, 'mac', 'Must be ${Packet.macSize} bytes');
-  }
-  return Uint8List.fromList(mac);
+// Writes the mac of the bytes before it, once the caller has written them.
+void _writeMac(Uint8List destination, int size, Uint8List sessionKey) {
+  final macOffset = size - Packet.macSize;
+  destination.setAll(
+    macOffset,
+    PacketMac.compute(
+      sessionKey,
+      Uint8List.sublistView(destination, 0, macOffset),
+    ),
+  );
 }
 
 void _checkSlot(int slot) =>

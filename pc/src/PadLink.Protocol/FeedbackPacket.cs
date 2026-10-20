@@ -23,16 +23,10 @@ public readonly record struct FeedbackPacket
     /// <summary>The <see cref="InputPacket.SentMs"/> of the last input packet the PC accepted from this phone.</summary>
     public ushort EchoMs { get; init; }
 
-    /// <summary>The 8 mac bytes read as a little-endian u64, so <see cref="Write"/> puts them back as they were.</summary>
-    public ulong Mac { get; init; }
-
-    /// <summary>
-    /// Reads a packet and checks its length, magic, version, type and slot. The mac needs the session
-    /// key, so the caller checks it.
-    /// </summary>
-    public static bool TryRead(ReadOnlySpan<byte> source, out FeedbackPacket packet, out PacketError error)
+    /// <summary>Reads a packet like <see cref="InputPacket.TryRead"/>.</summary>
+    public static bool TryRead(ReadOnlySpan<byte> source, ReadOnlySpan<byte> sessionKey, out FeedbackPacket packet, out PacketError error)
     {
-        error = Packet.CheckHeader(source, Size, Packet.FeedbackType);
+        error = Packet.Check(source, Size, Packet.FeedbackType, sessionKey);
         if (error != PacketError.None)
         {
             packet = default;
@@ -47,21 +41,20 @@ public readonly record struct FeedbackPacket
             Green = source[7],
             Blue = source[8],
             EchoMs = BinaryPrimitives.ReadUInt16LittleEndian(source[9..]),
-            Mac = BinaryPrimitives.ReadUInt64LittleEndian(source[MacOffset..]),
         };
         return true;
     }
 
-    /// <summary>Writes the packet to the first <see cref="Size"/> bytes of destination.</summary>
-    public void Write(Span<byte> destination)
+    /// <summary>Writes the packet, with its mac, to the first <see cref="Size"/> bytes of destination.</summary>
+    public void Write(Span<byte> destination, ReadOnlySpan<byte> sessionKey)
     {
-        Packet.WriteHeader(destination, Size, Packet.FeedbackType, Slot);
+        Packet.WriteHeader(destination, Size, Packet.FeedbackType, Slot, sessionKey);
         destination[4] = LargeMotor;
         destination[5] = SmallMotor;
         destination[6] = Red;
         destination[7] = Green;
         destination[8] = Blue;
         BinaryPrimitives.WriteUInt16LittleEndian(destination[9..], EchoMs);
-        BinaryPrimitives.WriteUInt64LittleEndian(destination[MacOffset..], Mac);
+        Packet.WriteMac(destination, Size, sessionKey);
     }
 }

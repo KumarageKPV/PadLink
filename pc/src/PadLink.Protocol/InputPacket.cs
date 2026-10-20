@@ -31,16 +31,13 @@ public readonly record struct InputPacket
     /// <summary>The phone's millisecond clock, which wraps.</summary>
     public ushort SentMs { get; init; }
 
-    /// <summary>The 8 mac bytes read as a little-endian u64, so <see cref="Write"/> puts them back as they were.</summary>
-    public ulong Mac { get; init; }
-
     /// <summary>
-    /// Reads a packet and checks its length, magic, version, type and slot. The mac needs the session
-    /// key, so the caller checks it.
+    /// Reads a packet and checks its length, magic, version, type, slot and mac. Throws
+    /// <see cref="ArgumentException"/> for a session key that isn't 32 bytes.
     /// </summary>
-    public static bool TryRead(ReadOnlySpan<byte> source, out InputPacket packet, out PacketError error)
+    public static bool TryRead(ReadOnlySpan<byte> source, ReadOnlySpan<byte> sessionKey, out InputPacket packet, out PacketError error)
     {
-        error = Packet.CheckHeader(source, Size, Packet.InputType);
+        error = Packet.Check(source, Size, Packet.InputType, sessionKey);
         if (error != PacketError.None)
         {
             packet = default;
@@ -58,15 +55,14 @@ public readonly record struct InputPacket
             Lt = source[18],
             Rt = source[19],
             SentMs = BinaryPrimitives.ReadUInt16LittleEndian(source[20..]),
-            Mac = BinaryPrimitives.ReadUInt64LittleEndian(source[MacOffset..]),
         };
         return true;
     }
 
-    /// <summary>Writes the packet to the first <see cref="Size"/> bytes of destination.</summary>
-    public void Write(Span<byte> destination)
+    /// <summary>Writes the packet, with its mac, to the first <see cref="Size"/> bytes of destination.</summary>
+    public void Write(Span<byte> destination, ReadOnlySpan<byte> sessionKey)
     {
-        Packet.WriteHeader(destination, Size, Packet.InputType, Slot);
+        Packet.WriteHeader(destination, Size, Packet.InputType, Slot, sessionKey);
         BinaryPrimitives.WriteUInt32LittleEndian(destination[4..], Sequence);
         BinaryPrimitives.WriteUInt16LittleEndian(destination[8..], (ushort)Buttons);
         BinaryPrimitives.WriteInt16LittleEndian(destination[10..], Lx);
@@ -76,6 +72,6 @@ public readonly record struct InputPacket
         destination[18] = Lt;
         destination[19] = Rt;
         BinaryPrimitives.WriteUInt16LittleEndian(destination[20..], SentMs);
-        BinaryPrimitives.WriteUInt64LittleEndian(destination[MacOffset..], Mac);
+        Packet.WriteMac(destination, Size, sessionKey);
     }
 }

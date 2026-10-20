@@ -25,17 +25,24 @@ const _buttons = {
   'reserved': PadButtons.reserved,
 };
 
+// Every packet vector's mac uses this key, the session key in crypto.json.
+final _sessionKey = hex(vectorFile('input.json')['sessionKey']);
+
 void main() {
+  test('feedback.json uses the same session key', () {
+    expect(vectorFile('feedback.json')['sessionKey'], toHex(_sessionKey));
+  });
+
   group('input.json', () {
     for (final vector in vectorGroup('input.json', 'valid')) {
       test('"${vector['name']}" reads to its fields and writes back', () {
         final bytes = hex(vector['hex']);
 
-        final packet = InputPacket.read(bytes);
+        final packet = InputPacket.read(bytes, _sessionKey);
 
-        expect(_inputFields(packet), vector['fields']);
+        expect(_inputFields(packet), _withoutMac(vector['fields']));
         final written = Uint8List(InputPacket.size);
-        packet.write(written);
+        packet.write(written, _sessionKey);
         expect(toHex(written), vector['hex']);
       });
 
@@ -45,16 +52,44 @@ void main() {
           (bits, name) => bits | _buttons[name]!,
         );
 
-        expect(InputPacket.read(hex(vector['hex'])).buttons, pressed);
+        expect(
+          InputPacket.read(hex(vector['hex']), _sessionKey).buttons,
+          pressed,
+        );
       });
+
+      test(
+        '"${vector['name']}" with any mac bit flipped is dropped for mac',
+        () {
+          _expectEachFlipDropped(
+            hex(vector['hex']),
+            InputPacket.macOffset,
+            InputPacket.size,
+            (bytes) => InputPacket.read(bytes, _sessionKey),
+          );
+        },
+      );
+
+      // The header bytes have their own checks, so a flip there may be dropped
+      // for another reason.
+      test(
+        '"${vector['name']}" with any field bit flipped is dropped for mac',
+        () {
+          _expectEachFlipDropped(
+            hex(vector['hex']),
+            4,
+            InputPacket.macOffset,
+            (bytes) => InputPacket.read(bytes, _sessionKey),
+          );
+        },
+      );
     }
 
     for (final vector in vectorGroup('input.json', 'invalid')) {
       test('"${vector['name']}" is dropped for ${vector['reason']}', () {
         _expectDropped(
-          vector,
-          InputPacket.size,
-          (bytes) => InputPacket.read(bytes).write,
+          () => InputPacket.read(hex(vector['hex']), _sessionKey),
+          vector['reason'],
         );
       });
     }
@@ -75,24 +110,65 @@ void main() {
       test('"${vector['name']}" reads to its fields and writes back', () {
         final bytes = hex(vector['hex']);
 
-        final packet = FeedbackPacket.read(bytes);
+        final packet = FeedbackPacket.read(bytes, _sessionKey);
 
-        expect(_feedbackFields(packet), vector['fields']);
+        expect(_feedbackFields(packet), _withoutMac(vector['fields']));
         final written = Uint8List(FeedbackPacket.size);
-        packet.write(written);
+        packet.write(written, _sessionKey);
         expect(toHex(written), vector['hex']);
       });
+
+      test(
+        '"${vector['name']}" with any mac bit flipped is dropped for mac',
+        () {
+          _expectEachFlipDropped(
+            hex(vector['hex']),
+            FeedbackPacket.macOffset,
+            FeedbackPacket.size,
+            (bytes) => FeedbackPacket.read(bytes, _sessionKey),
+          );
+        },
+      );
+
+      test(
+        '"${vector['name']}" with any field bit flipped is dropped for mac',
+        () {
+          _expectEachFlipDropped(
+            hex(vector['hex']),
+            4,
+            FeedbackPacket.macOffset,
+            (bytes) => FeedbackPacket.read(bytes, _sessionKey),
+          );
+        },
+      );
     }
 
     for (final vector in vectorGroup('feedback.json', 'invalid')) {
       test('"${vector['name']}" is dropped for ${vector['reason']}', () {
         _expectDropped(
-          vector,
-          FeedbackPacket.size,
-          (bytes) => FeedbackPacket.read(bytes).write,
+          () => FeedbackPacket.read(hex(vector['hex']), _sessionKey),
+          vector['reason'],
         );
       });
     }
+  });
+
+  test('reading and writing need a 32-byte session key', () {
+    final bytes = hex(vectorGroup('input.json', 'valid').first['hex']);
+    final packet = InputPacket.read(bytes, _sessionKey);
+
+    for (final key in [_sessionKey.sublist(1), Uint8List(0), Uint8List(33)]) {
+      expect(() => InputPacket.read(bytes, key), throwsArgumentError);
+      expect(
+        () => packet.write(Uint8List(InputPacket.size), key),
+        throwsArgumentError,
+      );
+    }
+    final feedback = hex(vectorGroup('feedback.json', 'valid').first['hex']);
+    expect(
+      () => FeedbackPacket.read(feedback, Uint8List(0)),
+      throwsArgumentError,
+    );
   });
 
   test('input packets refuse fields outside their wire range', () {
@@ -131,22 +207,6 @@ void main() {
     ]) {
       expect(make, throwsRangeError);
     }
-    expect(
-      () => InputPacket(
-        slot: 0,
-        sequence: 0,
-        buttons: 0,
-        lx: 0,
-        ly: 0,
-        rx: 0,
-        ry: 0,
-        lt: 0,
-        rt: 0,
-        sentMs: 0,
-        mac: Uint8List(7),
-      ),
-      throwsArgumentError,
-    );
   });
 
   test('feedback packets refuse fields outside their wire range', () {
@@ -167,56 +227,62 @@ void main() {
     expect(() => feedback(echoMs: -1), throwsRangeError);
   });
 
-  test('a packet without a mac writes 8 zero bytes for the sender to fill', () {
-    final written = Uint8List(FeedbackPacket.size)..fillRange(0, 19, 0xFF);
+  test('a packet built from its fields writes its vector, mac and all', () {
+    final vector = vectorGroup(
+      'feedback.json',
+      'valid',
+    ).firstWhere((vector) => vector['name'] == 'typical');
+    final fields = vector['fields'] as Map;
+    final written = Uint8List(FeedbackPacket.size);
 
     FeedbackPacket(
-      slot: 1,
-      largeMotor: 2,
-      smallMotor: 3,
-      red: 4,
-      green: 5,
-      blue: 6,
-      echoMs: 7,
-    ).write(written);
+      slot: fields['slot'] as int,
+      largeMotor: fields['largeMotor'] as int,
+      smallMotor: fields['smallMotor'] as int,
+      red: fields['red'] as int,
+      green: fields['green'] as int,
+      blue: fields['blue'] as int,
+      echoMs: fields['echoMs'] as int,
+    ).write(written, _sessionKey);
 
-    expect(toHex(written), '5001020102030405060700${'00' * 8}');
+    expect(toHex(written), vector['hex']);
   });
 
   test('write needs room for the whole packet', () {
     final packet = InputPacket.read(
       hex(vectorGroup('input.json', 'valid').first['hex']),
+      _sessionKey,
     );
 
-    expect(() => packet.write(Uint8List(29)), throwsArgumentError);
+    expect(() => packet.write(Uint8List(29), _sessionKey), throwsArgumentError);
   });
 }
 
-// Checking the mac needs the session key, which PLAN.md 2.4 adds, so a packet
-// with a bad mac passes every other check and writes back as it was.
-void _expectDropped(
-  Map<String, Object?> vector,
-  int size,
-  void Function(Uint8List destination) Function(Uint8List bytes) readThenWrite,
-) {
-  final bytes = hex(vector['hex']);
-  if (vector['reason'] == 'mac') {
-    final written = Uint8List(size);
-    readThenWrite(bytes)(written);
-    expect(written, bytes);
-    return;
-  }
+void _expectDropped(Object? Function() read, Object? reason, {String? bit}) {
   expect(
-    () => readThenWrite(bytes),
+    read,
     throwsA(
-      isA<PacketException>().having(
-        (e) => e.error.name,
-        'error',
-        vector['reason'],
-      ),
+      isA<PacketException>().having((e) => e.error.name, 'error', reason),
     ),
+    reason: bit,
   );
 }
+
+// Flips each bit of bytes start to end - 1 in turn.
+void _expectEachFlipDropped(
+  Uint8List bytes,
+  int start,
+  int end,
+  Object? Function(Uint8List bytes) read,
+) {
+  for (var bit = start * 8; bit < end * 8; bit++) {
+    _expectDropped(() => read(flipped(bytes, bit)), 'mac', bit: 'bit $bit');
+  }
+}
+
+// The packets keep no mac: the written bytes check it.
+Map<Object?, Object?> _withoutMac(Object? fields) =>
+    Map.of(fields as Map)..remove('mac');
 
 Map<String, Object> _inputFields(InputPacket packet) => {
   'magic': Packet.magic,
@@ -232,7 +298,6 @@ Map<String, Object> _inputFields(InputPacket packet) => {
   'lt': packet.lt,
   'rt': packet.rt,
   'sentMs': packet.sentMs,
-  'mac': toHex(packet.mac),
 };
 
 Map<String, Object> _feedbackFields(FeedbackPacket packet) => {
@@ -246,5 +311,4 @@ Map<String, Object> _feedbackFields(FeedbackPacket packet) => {
   'green': packet.green,
   'blue': packet.blue,
   'echoMs': packet.echoMs,
-  'mac': toHex(packet.mac),
 };

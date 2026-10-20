@@ -1,3 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Packets, control-message framing and (from PLAN.md 2.4) crypto: protocol/SPEC.md in C#. -->
+  <!-- Packets, control-message framing and crypto: protocol/SPEC.md in C#. -->
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PadLink.Protocol.Tests" />
+  </ItemGroup>
 </Project>

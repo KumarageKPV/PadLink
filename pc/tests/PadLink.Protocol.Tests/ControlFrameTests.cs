@@ -242,40 +242,40 @@ public class ControlFrameTests
     }
 
     [Theory]
-    [InlineData("""{"type":"mode_changed","mode":"Mixed"}""")] // names are case-sensitive
-    [InlineData("""{"type":"mode_changed","mode":0}""")] // no enum numbers
-    [InlineData("""{"type":"slot_changed","slot":4,"colour":"#00C853","padType":"DS4"}""")]
-    [InlineData("""{"type":"hello","proto":1,"deviceId":"d","deviceName":"n","platform":"Android","appVersion":"1","nonce":"oKGio6SlpqeoqaqrrK2urw=="}""")]
-    [InlineData("""{"type":"battery","pct":"57"}""")] // no numbers in strings
-    [InlineData("""{"type":"battery","pct":null}""")]
-    [InlineData("""{"type":"battery","PCT":57}""")] // field names are case-sensitive, so pct is missing
-    [InlineData("""{"type":"battery"}""")] // a missing number isn't 0
-    [InlineData("""{"type":"slot_changed","colour":"#00C853","padType":"ds4"}""")]
-    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw==\n"}""")]
-    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2u\nrw=="}""")]
-    [InlineData("""{"type":"challenge","nonce":"=oKGio6SlpqeoqaqrrK2urw="}""")]
-    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw==="}""")]
-    [InlineData("""{"type":"ping"} {}""")] // two values
-    [InlineData("""{"type":"ping",}""")] // a trailing comma
-    [InlineData("""{"type":"ping"/* a comment */}""")]
-    [InlineData("""{"type":"ping","x":"\ud800"}""")]
-    [InlineData("""{"type":"ping","x":"\udc00"}""")]
-    [InlineData("""{"type":"ping","x":"\ud800\u0041"}""")]
-    [InlineData("""{"type":"ping","x":"\ud800\ud800"}""")]
-    [InlineData("""{"type":"ping","x":"\ud800","type":"ping"}""")]
-    [InlineData("""{"type":"error","code":null}""")]
-    [InlineData("""{"type":"ping","type":5}""")] // no object repeats a name
-    [InlineData("""{"type":"bye","type":"ping"}""")]
-    [InlineData("""{"type":"ping","x":[{"a":1,"a":2}]}""")]
-    [InlineData("""{"type":"ping","x":{"\u0061":1,"a":2}}""")] // compared after unescaping
-    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urx=="}""")] // an unused bit set
-    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw%3D%3D"}""")]
-    [InlineData("""   """)]
-    public void Frames_the_vectors_do_not_cover_are_bad_messages(string json)
+    [InlineData("""{"type":"mode_changed","mode":"Mixed"}""", ControlFault.Field)] // names are case-sensitive
+    [InlineData("""{"type":"mode_changed","mode":0}""", ControlFault.Field)] // no enum numbers
+    [InlineData("""{"type":"slot_changed","slot":4,"colour":"#00C853","padType":"DS4"}""", ControlFault.Field)]
+    [InlineData("""{"type":"hello","proto":1,"deviceId":"d","deviceName":"n","platform":"Android","appVersion":"1","nonce":"oKGio6SlpqeoqaqrrK2urw=="}""", ControlFault.Field)]
+    [InlineData("""{"type":"battery","pct":"57"}""", ControlFault.Field)] // no numbers in strings
+    [InlineData("""{"type":"battery","pct":null}""", ControlFault.Field)]
+    [InlineData("""{"type":"battery","PCT":57}""", ControlFault.Field)] // field names are case-sensitive, so pct is missing
+    [InlineData("""{"type":"battery"}""", ControlFault.Field)] // a missing number isn't 0
+    [InlineData("""{"type":"slot_changed","colour":"#00C853","padType":"ds4"}""", ControlFault.Field)]
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw==\n"}""", ControlFault.Field)]
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2u\nrw=="}""", ControlFault.Field)]
+    [InlineData("""{"type":"challenge","nonce":"=oKGio6SlpqeoqaqrrK2urw="}""", ControlFault.Field)]
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw==="}""", ControlFault.Field)]
+    [InlineData("""{"type":"ping"} {}""", ControlFault.Json)] // two values
+    [InlineData("""{"type":"ping",}""", ControlFault.Json)] // a trailing comma
+    [InlineData("""{"type":"ping"/* a comment */}""", ControlFault.Json)]
+    [InlineData("""{"type":"ping","x":"\ud800"}""", ControlFault.Utf8)]
+    [InlineData("""{"type":"ping","x":"\udc00"}""", ControlFault.Utf8)]
+    [InlineData("""{"type":"ping","x":"\ud800\u0041"}""", ControlFault.Utf8)]
+    [InlineData("""{"type":"ping","x":"\ud800\ud800"}""", ControlFault.Utf8)]
+    [InlineData("""{"type":"ping","x":"\ud800","type":"ping"}""", ControlFault.Utf8)] // the scan stops at the first fault, before the repeated type
+    [InlineData("""{"type":"error","code":null}""", ControlFault.Field)]
+    [InlineData("""{"type":"ping","type":5}""", ControlFault.NameRepeated)] // no object repeats a name
+    [InlineData("""{"type":"bye","type":"ping"}""", ControlFault.NameRepeated)]
+    [InlineData("""{"type":"ping","x":[{"a":1,"a":2}]}""", ControlFault.NameRepeated)]
+    [InlineData("""{"type":"ping","x":{"\u0061":1,"a":2}}""", ControlFault.NameRepeated)] // compared after unescaping
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urx=="}""", ControlFault.Field)] // an unused bit set
+    [InlineData("""{"type":"challenge","nonce":"oKGio6SlpqeoqaqrrK2urw%3D%3D"}""", ControlFault.Field)]
+    [InlineData("""   """, ControlFault.Json)]
+    public void Frames_the_vectors_do_not_cover_are_bad_messages(string json, ControlFault expected)
     {
         Assert.False(ControlFrame.TryDecode(Encoding.UTF8.GetBytes(json), out var message, out var fault), json);
         Assert.Null(message);
-        Assert.NotEqual(ControlFault.None, fault);
+        Assert.Equal(expected, fault);
     }
 
     // The type's value is read as the next token, so an object there must still get its own names.

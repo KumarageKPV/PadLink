@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json.Nodes;
 
 namespace PadLink.Protocol.Tests;
@@ -6,6 +5,8 @@ namespace PadLink.Protocol.Tests;
 public class FeedbackPacketTests
 {
     private const string File = "feedback.json";
+
+    private static readonly byte[] SessionKey = Vectors.Hex(Vectors.File(File)["sessionKey"]);
 
     public static TheoryData<string> Valid => Vectors.Names(File, "valid");
     public static TheoryData<string> Invalid => Vectors.Names(File, "invalid");
@@ -18,7 +19,7 @@ public class FeedbackPacketTests
         var bytes = Vectors.Hex(vector["hex"]);
         var fields = vector["fields"]!.AsObject();
 
-        Assert.True(FeedbackPacket.TryRead(bytes, out var packet, out var error), $"rejected for {error}");
+        Assert.True(FeedbackPacket.TryRead(bytes, SessionKey, out var packet, out var error), $"rejected for {error}");
         Assert.Equal(PacketError.None, error);
         Assert.Equal(Packet.Magic, fields["magic"]!.GetValue<byte>());
         Assert.Equal(Packet.Version, fields["version"]!.GetValue<byte>());
@@ -26,7 +27,7 @@ public class FeedbackPacketTests
         Assert.Equal(Expected(fields), packet);
 
         var written = new byte[FeedbackPacket.Size];
-        packet.Write(written);
+        packet.Write(written, SessionKey);
         Assert.Equal(Convert.ToHexStringLower(bytes), Convert.ToHexStringLower(written));
     }
 
@@ -38,20 +39,42 @@ public class FeedbackPacketTests
         var bytes = Vectors.Hex(vector["hex"]);
         var reason = vector["reason"]!.GetValue<string>();
 
-        var read = FeedbackPacket.TryRead(bytes, out var packet, out var error);
+        var read = FeedbackPacket.TryRead(bytes, SessionKey, out var packet, out var error);
 
-        if (reason == "mac")
-        {
-            // Checking the mac needs the session key, which PLAN.md 2.4 adds. Every other field passes.
-            Assert.True(read, $"rejected for {error}");
-            var written = new byte[FeedbackPacket.Size];
-            packet.Write(written);
-            Assert.Equal(bytes, written);
-            return;
-        }
         Assert.False(read);
         Assert.Equal(reason, error.ToString().ToLowerInvariant());
         Assert.Equal(default, packet);
+    }
+
+    [Theory]
+    [MemberData(nameof(Valid))]
+    public void Any_flipped_mac_bit_is_dropped_for_mac(string name)
+    {
+        var bytes = Vectors.Hex(Vectors.Get(File, "valid", name)["hex"]);
+
+        for (var bit = FeedbackPacket.MacOffset * 8; bit < FeedbackPacket.Size * 8; bit++)
+            AssertDroppedForMac(Vectors.Flipped(bytes, bit), bit);
+    }
+
+    // The header bytes have their own checks, so a flip there may be dropped for another reason.
+    [Theory]
+    [MemberData(nameof(Valid))]
+    public void Any_flipped_bit_between_the_header_and_the_mac_is_dropped_for_mac(string name)
+    {
+        var bytes = Vectors.Hex(Vectors.Get(File, "valid", name)["hex"]);
+
+        for (var bit = 4 * 8; bit < FeedbackPacket.MacOffset * 8; bit++)
+            AssertDroppedForMac(Vectors.Flipped(bytes, bit), bit);
+    }
+
+    [Fact]
+    public void Reading_and_writing_need_a_32_byte_session_key()
+    {
+        var bytes = Vectors.Hex(Vectors.Get(File, "valid", "typical")["hex"]);
+
+        Assert.Throws<ArgumentException>(() => FeedbackPacket.TryRead(bytes, SessionKey[..^1], out _, out _));
+        Assert.Throws<ArgumentException>(() => FeedbackPacket.TryRead(bytes, [], out _, out _));
+        Assert.Throws<ArgumentException>(() => new FeedbackPacket().Write(new byte[FeedbackPacket.Size], SessionKey[..^1]));
     }
 
     [Fact]
@@ -59,13 +82,13 @@ public class FeedbackPacketTests
     {
         var packet = new FeedbackPacket { Slot = 16 };
 
-        Assert.Throws<InvalidOperationException>(() => packet.Write(new byte[FeedbackPacket.Size]));
+        Assert.Throws<InvalidOperationException>(() => packet.Write(new byte[FeedbackPacket.Size], SessionKey));
     }
 
     [Fact]
     public void Write_refuses_a_buffer_too_small()
     {
-        Assert.Throws<ArgumentException>(() => new FeedbackPacket().Write(new byte[FeedbackPacket.Size - 1]));
+        Assert.Throws<ArgumentException>(() => new FeedbackPacket().Write(new byte[FeedbackPacket.Size - 1], SessionKey));
     }
 
     private static FeedbackPacket Expected(JsonObject fields) => new()
@@ -77,6 +100,12 @@ public class FeedbackPacketTests
         Green = fields["green"]!.GetValue<byte>(),
         Blue = fields["blue"]!.GetValue<byte>(),
         EchoMs = fields["echoMs"]!.GetValue<ushort>(),
-        Mac = BinaryPrimitives.ReadUInt64LittleEndian(Vectors.Hex(fields["mac"])),
     };
+
+    private static void AssertDroppedForMac(byte[] bytes, int bit)
+    {
+        Assert.False(FeedbackPacket.TryRead(bytes, SessionKey, out var packet, out var error), $"bit {bit}");
+        Assert.Equal(PacketError.Mac, error);
+        Assert.Equal(default, packet);
+    }
 }

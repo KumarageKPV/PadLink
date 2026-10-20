@@ -20,20 +20,40 @@ void main() {
           vector['message'],
         );
       });
+    }
 
-      // Senders write compact JSON, type first, fields in table order, escaping
-      // only what JSON requires. So where the vector's JSON is in that form, the
-      // bytes match too. Some vectors show what other senders may write.
+    // Senders write compact JSON, type first, fields in table order, escaping
+    // only what JSON requires. So where the vector's JSON is in that form, the
+    // bytes match too. The others show what other senders may write.
+    for (final vector in vectorGroup(
+      _file,
+      'valid',
+    ).where((vector) => vector['json'] == jsonEncode(vector['message']))) {
       test('"${vector['name']}" encodes to its bytes in sender form', () {
-        final json = vector['json'] as String;
-        if (json != jsonEncode(vector['message'])) return;
-
         final frame = ControlFrame.encode(_decode(hex(vector['frameHex'])));
 
-        expect(utf8.decode(frame.sublist(ControlFrame.headerSize)), json);
+        expect(
+          utf8.decode(frame.sublist(ControlFrame.headerSize)),
+          vector['json'],
+        );
         expect(toHex(frame), vector['frameHex']);
       });
     }
+
+    test('only the vectors that show other senders are not in sender form', () {
+      expect(
+        [
+          for (final vector in vectorGroup(_file, 'valid'))
+            if (vector['json'] != jsonEncode(vector['message'])) vector['name'],
+        ],
+        unorderedEquals([
+          'unknown field',
+          'fields in another order, with spaces',
+          'an escaped surrogate pair',
+          'names repeated only across objects',
+        ]),
+      );
+    });
 
     for (final vector in vectorGroup(_file, 'ignored')) {
       test('"${vector['name']}" is ignored', () {

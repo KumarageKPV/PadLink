@@ -181,7 +181,7 @@ Flutter on the phone and C# on .NET 10 on the PC, with the ViGEmBus driver creat
 | Driver client | [Nefarius.ViGEm.Client](https://www.nuget.org/packages/Nefarius.ViGEm.Client) | 1.21.256, MIT, .NET Standard 2.0 | Managed API with rumble and LED callbacks |
 | Game detection (per-game modes) | WMI process-start events (`Win32_ProcessStartTrace`) | Built into Windows | Notices a profiled game launching |
 | LAN discovery | Windows DNS-SD API (`DnsServiceRegister`, dnsapi.dll) via P/Invoke | Built into Windows 10/11 | No extra mDNS service to install |
-| Crypto | System.Security.Cryptography | Built in | Matches the phone's HMAC-SHA256 |
+| Crypto | System.Security.Cryptography, plus [BouncyCastle.Cryptography](https://www.nuget.org/packages/BouncyCastle.Cryptography) for X25519 | Built in; BouncyCastle 2.7.0, MIT | HMAC-SHA256 and HKDF match the phone's; .NET 10 has no X25519 (docs/decisions.md) |
 
 **Shared and tooling**
 
@@ -527,7 +527,9 @@ The phone app ships through Google Play and the App Store; the PC app ships as a
 | --- | --- | --- |
 | [ViGEmBus](https://github.com/nefarius/ViGEmBus) | BSD-3-Clause | Keep its copyright notice in the installer credits |
 | [Nefarius.ViGEm.Client](https://www.nuget.org/packages/Nefarius.ViGEm.Client) | MIT | Include its notice |
+| [BouncyCastle.Cryptography](https://www.nuget.org/packages/BouncyCastle.Cryptography) | MIT | Include its notice in the installer credits |
 | Flutter and Dart | BSD-3-Clause | Show notices on an About screen (Flutter's licence page does this) |
+| [cryptography](https://pub.dev/packages/cryptography) (Dart) | Apache-2.0 | Show its licence on the About screen (Flutter's licence page does this; it has no NOTICE file) |
 | vJoy (v2) | Check in M4 | — |
 
 **Naming and trademarks**

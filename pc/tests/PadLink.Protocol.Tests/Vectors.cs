@@ -27,6 +27,14 @@ internal static class Vectors
 
     public static byte[] Hex(JsonNode? node) => Convert.FromHexString(node!.GetValue<string>());
 
+    /// <summary>A copy of bytes with one bit flipped. Bit 0 is the low bit of the first byte.</summary>
+    public static byte[] Flipped(byte[] bytes, int bit)
+    {
+        var flipped = (byte[])bytes.Clone();
+        flipped[bit / 8] ^= (byte)(1 << (bit % 8));
+        return flipped;
+    }
+
     // Tests run from bin/<configuration>/<framework>/, so walk up to the repository root.
     private static string FindFolder()
     {

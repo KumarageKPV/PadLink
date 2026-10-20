@@ -15,6 +15,13 @@ One entry per change to `docs/design.md`, or per choice the design leaves open (
 
 ## Entries
 
+### 2026-10-20 — X25519 on the PC through BouncyCastle.Cryptography
+- **Iteration:** 2.4
+- **Context:** .NET 10 (SDK 10.0.401) has no X25519 type. Windows CNG reaches the curve through `ECDiffieHellman` with `ECCurve.CreateFromFriendlyName("curve25519")`. On Windows 11 (build 26300) that can generate a key pair and derive a secret from a peer's public key, but importing a private key throws `CryptographicException: The requested operation is not supported`. So it can't use RFC 7748's fixed keys, and nothing could check it against `crypto.json`. The design's PC row named only System.Security.Cryptography. On the phone, Dart's `cryptography` 2.9.0 matches RFC 7748, but it returns an all-zero shared secret for the `rejectedPublicKeys` instead of failing, so `X25519KeyPair.agree` checks for that itself.
+- **Decision:** `PadLink.Protocol` uses BouncyCastle.Cryptography 2.7.0 (MIT) for X25519 only, through its RFC 7748 `X25519` class, whose `CalculateAgreement` returns false for an all-zero secret. Private keys come from `RandomNumberGenerator`. HMAC-SHA256, HKDF and the constant-time compare stay in System.Security.Cryptography.
+- **Alternatives:** CNG's curve25519 through `ECDiffieHellman`. Rejected: no private-key import, so it can't be tested against the vectors, and it was only tried on Windows 11. Write X25519 by hand. Rejected: hand-written curve code needs its own review, while the library is maintained and widely used.
+- **Design change:** "Tech stack", PC companion: the Crypto row adds BouncyCastle.Cryptography for X25519. "Distribution, licensing and legal", Licences: rows for BouncyCastle.Cryptography and the phone's `cryptography` package, which now ship.
+
 ### 2026-10-20 — A byte-order mark before a control message is bad_message
 - **Iteration:** 2.3
 - **Context:** RFC 8259 forbids senders to put a byte-order mark before networked JSON, but lets parsers ignore one, and SPEC.md didn't say which. Python's `json.loads` and System.Text.Json reject it as not JSON. Dart's `utf8.decode` drops a leading one without telling, so Dart accepted the frame.

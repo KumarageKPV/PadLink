@@ -29,6 +29,11 @@ Uint8List hex(Object? text) {
 String toHex(List<int> bytes) =>
     bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
 
+/// A copy of bytes with one bit flipped. Bit 0 is the low bit of the first
+/// byte.
+Uint8List flipped(Uint8List bytes, int bit) =>
+    Uint8List.fromList(bytes)..[bit ~/ 8] ^= 1 << (bit % 8);
+
 // dart test runs from the package folder, so walk up to the repository root.
 Directory _findFolder() {
   for (var dir = Directory.current.absolute; ; dir = dir.parent) {
